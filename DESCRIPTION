@@ -1,0 +1,21 @@
+Package: bs3fa
+Type: Package
+Title: Bayesian sparse and smooth supervised factor analysis
+Version: 1.0
+Date: 2019-05-07
+Author: Kelly R. Moran
+Maintainer: Kelly R. Moran <kelly.r.moran@duke.edu>
+Description: Bayesian sampler for sparse and smooth supervised factor analysis, appropriate for data in which you observe functional Y and numeric (continuous, binary, count) data X. The model assumes all variation in Y is explained by some low-dimensional factors eta, and these factors also explain part (but not all) of the variation in X.
+Imports: 
+    Rcpp (>= 1.0.0),
+    parallel,
+    abind
+Suggests: 
+    reshape2,
+    ggplot2,
+    gridExtra,
+    mvtnorm,
+    sparseEigen,
+    pracma
+LinkingTo: Rcpp, RcppArmadillo, RcppDist
+LazyData: true

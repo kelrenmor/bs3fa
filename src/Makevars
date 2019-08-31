@@ -1,0 +1,2 @@
+PKG_CPPFLAGS = -I"../include" -DUSE_DOUBLE -DEIGEN_NO_DEBUG  -DR_COMPILATION=TRUE --std=c++11 -O3 -funroll-loops -ffast-math -ffinite-math-only -g -Wno-ignored-attributes 
+PKG_LIBS = -ldl

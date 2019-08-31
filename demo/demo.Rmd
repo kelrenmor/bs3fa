@@ -1,0 +1,406 @@
+---
+title: "Demonstration"
+output:
+  beamer_presentation:
+    theme: "Madrid"
+    includes:
+      in_header: demo_header.tex
+---
+
+```{r setup, include=FALSE}
+library(devtools)
+library(ggplot2)
+library(gridExtra)
+```
+
+## Pre-demo setup steps
+
+- Download instructions available at: \url{http://nas-sites.org/emergingscience/files/2019/06/Demo-Set-Up-Instructions.pdf}. \vfill
+- Package available at: \href{https://github.com/kelrenmor/bs3fa}{https://github.com/kelrenmor/bs3fa}. \vfill
+- Demo code available at \href{https://github.com/kelrenmor/bs3fa/tree/master/demo}{https://github.com/kelrenmor/bs3fa/tree/master/demo}. \vfill
+- After install, load the package. \vfill
+- The data set `drdat` has ToxCast data that will be used for simulating realistic dose response curves.
+
+```{r load-package, message=F, warning=F}
+# Load bs3fa and dataset drdat
+library(bs3fa)
+data('drdat')
+```
+
+## Simulate dose-response and feature data
+
+\small
+```{r simulate-data}
+# Set up values for data simulation
+
+set.seed(12345) # set seed for random number generation
+N=300          # no of 'chemicals'
+D=20; S=40     # no of unique doses (D) and features (S)
+K=3; J=4 # dim of shared (K) and X-specific (J) latent space
+std_error_y=0.2 # noise in observing curves (Y)
+std_error_x=0.1 # noise in observing features (X)
+prob_miss=0.7 # expected prop of dose-response grid unobserved
+real_Y=drdat # use ToxCast data to simulate basis for Y 
+
+# Simulate dose-response and feature data 
+
+dat=bs3fa::simulate_data(real_Y=real_Y,N=N,D=D,S=S,K=K,J=J,
+                         prob_miss=prob_miss,
+                         std_error_y=std_error_y,
+                         std_error_x=std_error_x)
+```
+
+## Average dose-response curve
+
+```{r plot-avg, fig.align='center', fig.height=3, fig.width=4.5, echo=F, warning=F}
+qplot(dat$doses, dat$avg_dose_resp, geom=c("point", "line")) + 
+  theme_minimal() + theme_bw() + xlab("dose") + ylab("average response")
+```
+
+## Example dose-response curves
+
+```{r plot-data, fig.align='center', fig.height=3, fig.width=4.5, echo=F, warning=F}
+bs3fa::plot_data(Y=dat$Y, true_curve=dat$Lambda_true%*%dat$eta_true, 
+                 avg_dose_resp=dat$avg_dose_resp, doses=dat$doses, inds=1:3)
+```
+
+## True $Y$ factor loadings $\Lambda$ (visual 1)
+
+\begin{equation*}
+\def\sss{\scriptscriptstyle}
+\setstackgap{L}{8pt}
+\def\stacktype{L}
+\stackunder{Y_i}{\sss D\times 1} =  \stackunder{\Lambda}{\sss D\times K\text{ }}
+\stackunder{\eta_i}{\sss K\times 1} + \stackunder{\varepsilon_i}{\sss D\times 1}.
+\end{equation*}
+
+```{r plot-lambda-1, fig.align='center', fig.height=2.5, fig.width=4.5, echo=F, warning=F}
+bs3fa::plot_matrix(dat$Lambda_true, type="Lambda")
+```
+
+## True $Y$ factor loadings $\Lambda$ (visual 2)
+
+\begin{equation*}
+\def\sss{\scriptscriptstyle}
+\setstackgap{L}{8pt}
+\def\stacktype{L}
+\stackunder{Y_i}{\sss D\times 1} =  \stackunder{\Lambda}{\sss D\times K\text{ }}
+\stackunder{\eta_i}{\sss K\times 1} + \stackunder{\varepsilon_i}{\sss D\times 1}.
+\end{equation*}
+
+```{r plot-lambda-2, fig.align='center', fig.height=2.5, fig.width=4.5, echo=F, warning=F}
+bs3fa::plot_Lambda_true(Lambda=dat$Lambda_true, doses=dat$doses)
+```
+
+## True $X$ common factor loadings $\Theta$ (visual 1)
+
+\begin{equation*}
+\def\sss{\scriptscriptstyle}
+\setstackgap{L}{8pt}
+\def\stacktype{L}
+\stackunder{X_i}{\sss S\times 1} =  \stackunder{\Theta}{\sss S\times K\text{ }}
+\stackunder{\eta_i}{\sss K\times 1} + \stackunder{\Xi}{\sss S\times J\text{ }}
+\stackunder{\nu_i}{\sss J\times 1} + \stackunder{\mathrm{e}_i}{\sss S\times 1},
+\end{equation*}
+
+```{r plot-theta-1, fig.align='center', fig.height=2.5, fig.width=4.5, echo=F, warning=F}
+bs3fa::plot_matrix(dat$Theta_true, type="Theta")
+```
+
+## True $X$ common factor loadings $\Theta$ (visual 2)
+
+\begin{equation*}
+\def\sss{\scriptscriptstyle}
+\setstackgap{L}{8pt}
+\def\stacktype{L}
+\stackunder{X_i}{\sss S\times 1} =  \stackunder{\Theta}{\sss S\times K\text{ }}
+\stackunder{\eta_i}{\sss K\times 1} + \stackunder{\Xi}{\sss S\times J\text{ }}
+\stackunder{\nu_i}{\sss J\times 1} + \stackunder{\mathrm{e}_i}{\sss S\times 1},
+\end{equation*}
+
+```{r plot-theta-2, fig.align='center', fig.height=2.5, fig.width=4.5, echo=F, warning=F}
+qplot(c(dat$Theta_true), bins=20) + xlab(expression(theta[s*","~i])) + 
+  ylab("frequency") + theme_minimal() + theme_bw()
+```
+
+## Prior to running the model
+
+- In addition to learning about $\Lambda,$ $\Theta,$ and $\eta,$ we want to be able to predict dose-response for chemicals for which we only observe structure. \vfill
+- To mimic this, we set the dose response curves for 20\% of chemicals to be unobserved. \vfill
+- We will be able to compare the model-predicted dose-response curves to the truth. \vfill
+
+```{r make-missing}
+# Randomly set 20% of dose-response curves to NA
+prop_unobserved = 0.2
+not_obs = sample(1:N, round(prop_unobserved*N))
+dat$Y[,not_obs] = NA
+```
+
+
+## Run model
+
+\small
+```{r run-mod, cache=T, message=F, warning=F}
+# Fix sampler settings
+K_p=dat$K+3 # give sampler 'guess' at true shared loadings
+J_p=dat$J+3 # give sampler 'guess' at true X-specific loadings
+thin=10     # keep every 10th sample
+burnin=5000 # run sampler for 5000 draws before beginning to save
+nsamps_save=500 # save 500 samples in total
+post_process=T # resolve label/sign switches, rotational ambiguity
+random_init=F  # intial guess based on SVD rather than random init
+
+# Run sampler
+res=bs3fa::run_bs3fa(X=dat$X, Y=dat$Y, K=K_p, J=J_p, 
+                     thin=thin, nsamps_save=nsamps_save, 
+                     burnin=burnin, post_process=post_process, 
+                     random_init=random_init, scale_X=F,
+                     print_progress=F,
+                     update_ls=list("type"="manual", 
+                                    "reset_ls"=round(3*burnin/4), 
+                                    "l_new"=0.111))
+
+```
+
+## Aside: Gibbs sampling
+
+- Goal: Sample from the model posterior. \vfill
+- Problem: We can't directly use the model posterior. 
+    - E.g., we don't know how to write down an equation for $\text{Pr}(\Theta|\text{observed data, priors})$ \vfill
+- Solution: We can approximate the model posterior using samples from the ``full conditional'' distribution of the parameters (e.g., $\text{Pr}(\Theta|\text{observed data, priors, other parameters})$). \vfill
+- How: Move around the parameter space, using all previous parameter draws as the ``truth.'' \vfill
+- For more information: See \href{http://www2.stat.duke.edu/~rcs46/modern_bayes17/lecturesModernBayes17/lecture-7/07-gibbs.pdf}{link to lecture slides}.
+
+## Under the hood of `run_bs3fa`
+
+\small
+```{r run_sampler-chunk-1, eval=FALSE}
+# Define dimensions, check for data orientation
+D = nrow(Y)
+S = nrow(X)
+N = ncol(X); N1 = ncol(Y)
+if( !(N==N1) ){ stop("ncol(X) must equal ncol(Y)") }
+
+# Initialize parameters
+init_list = sampler_init(random_init, N, D, S, K, J, X_type, X)
+list2env(init_list,environment()) # list entries to environment
+
+# Define hyperparameter values
+a_sig_y = b_sig_y = a_sig_x = b_sig_x = 1; 
+g_xi = g_psi = 1; 
+a1_delta_xi = a1_delta_om = 2.1; 
+a2_delta_xi = a2_delta_om = 3.1;
+```
+
+## Under the hood of `run_bs3fa` (continued)
+
+\small
+```{r run_sampler-chunk-2, eval=FALSE}
+# Sample X-specific factor loading matrix and shrinkage params
+
+# X-specific factor loading matrix 
+Theta = sample_Theta(X, nu, eta, xi, sigsq_x_vec, 
+                     betasq_th, gammasq_th, tau_ome)
+# Hyper-params (note tau_ome sampled in Lambda region)
+betasq_th = sample_betasq_th(t,Theta,gammasq_th,tau_ome)
+gammasq_th = sample_gammasq_th(s_mat,Theta,betasq_th,tau_ome)
+# Hyper-hyper-params
+s_mat = sample_s_mat(gammasq_th)
+t = sample_t(betasq_th)
+
+# Sample shared factor score eta = [\eta_1, ..., \eta_N]
+
+eta = sample_eta_all(Y, X, xi, nu, Lambda, Theta, 
+                     sigsq_y_vec, sigsq_x_vec, obs_Y)
+
+# Etc... (continue on to all other parameters)
+```
+
+## Under the hood of `run_bs3fa` functions
+
+\small
+```{r run_sampler-chunk-3, eval=FALSE}
+# X-specific factor loading matrix
+Theta = sample_Theta(X, nu, eta, xi, sigsq_x_vec, 
+                     betasq_th, gammasq_th, tau_ome)
+```
+
+- Prior on entries of $\Theta$: $\theta_{s,k} \sim \text{N}(0, \beta^2 \gamma_{s,k}^2 \alpha_k)$.\vfill
+
+- $\Theta$ enters the data likelihood via observations $X_i$ because $X_i=\Theta \eta_i + \Xi \nu_i + e_i,$ where $e_i\sim \text{N}(0, \text{diag}(\sigma_1^2,\ldots,\sigma_S^2)).$\vfill
+
+- Let $X_i^* = X_i - \Xi \nu_i,$ then the posterior is:
+$$
+\begin{aligned}
+  \text{Pr}(s&\text{th row of }\Theta |\text{observed data, priors, all other parameters}) \\
+  = & \text{Pr}(\Theta_{s,\cdot}|\{X_{s,i}^*\},\{\eta_i\}, \sigma_s^2) \\
+  \sim & \text{N}( (v_s^{-1} + \sigma_s^{-2}\tilde{\eta}^T\tilde{\eta})^{-1}\tilde{\eta}^T\sigma_s^{-2} X_{s,\cdot}^*, v_s^{-1} + \sigma_s^{-2}\tilde{\eta}^T\tilde{\eta}), \\
+  & \text{where } v_s^{-1} = \text{diag}(\beta^{-2} \gamma_{s,k}^{-2} \alpha_k^{-1}) \\
+  & \text{and } \tilde{\eta}^T = [\eta_1, \ldots, \eta_N].
+\end{aligned}
+$$
+
+## Model performance ($\Theta$)
+
+```{r model-display-the-pre-clean, fig.align='center', fig.height=2.35, fig.width=4.5, echo=F, warning=F}
+#p1 <- bs3fa::plot_matrix(dat$Theta_true, type="Theta", tit="Truth", include_legend=F)
+#The_tmp = matrix(NA,nrow=nrow(dat$Theta_true),ncol=K_p)
+#for(k_mod in 1:K_p){
+#  # Get mean
+#  The_tmp[,k_mod] = apply(res$Theta_save[,k_mod,],1,mean)
+#}
+#p2 <- bs3fa::plot_matrix(The_tmp, type="Theta", tit="Estimate", include_legend=F)
+#gridExtra::grid.arrange(p1, p2, nrow = 1, widths = c(3/9,6/9))
+
+# Model performance ($\Lambda$)
+ p1 <- bs3fa::plot_matrix(dat$Lambda_true*res$norm_rescale, type="Lambda", tit="Truth", include_legend=F)
+ Lam_tmp = matrix(NA,nrow=nrow(dat$Lambda_true),ncol=K_p)
+ for(k_mod in 1:K_p){
+   # Get mean
+   Lam_tmp[,k_mod] = apply(res$Lambda_save[,k_mod,],1,mean)
+ }
+ p2 <- bs3fa::plot_matrix(Lam_tmp, type="Lambda", tit="Estimate", include_legend=F)
+ gridExtra::grid.arrange(p1, p2, nrow = 1, widths = c(3/9,6/9))
+```
+
+We have recovered very closely one of the matrices in the equivalence class with our true $\Lambda$ matrix. All of the forms of inference we can do on this estimated matrix are still valid: the groups and the contrasts within each factor column are maintained.
+
+
+## Matching model column indices and sign to truth
+
+- The post-processing in the `run_bs3fa` code:
+    - Resolves rotational ambiguity 
+    - Aligns samples \vfill
+- It does not use any ``truth'' because outside of simulation we don't know the truth \vfill
+- For convenience, we want to match the labels, signs, and rotational alignment of our samples to that of the truth so we can see how well the sampler is doing
+
+\small
+```{r clean-model}
+# When 'truth' is known, re-index model runs to match true indices
+# (this is just for later plotting convenience)
+res_clean = bs3fa::reorder_entries(eta_true=dat$eta_true, 
+                   eta=res$eta_save, Lambda_true=dat$Lambda_true, 
+                   Lambda=res$Lambda_save,
+                   Theta_true=dat$Theta_true,
+                   Theta=res$Theta_save)
+
+```
+
+## Model performance ($\Theta$)
+
+```{r model-display-the-1, fig.align='center', fig.height=2.75, fig.width=4.5, echo=F, warning=F}
+p1 <- bs3fa::plot_matrix(dat$Theta_true, type="Theta", tit="Truth", include_legend=F)
+p2 <- bs3fa::plot_matrix(res_clean$Theta, type="Theta", tit="Estimate", include_legend=F)
+gridExtra::grid.arrange(p1, p2, nrow = 1, widths = c(3/9,6/9))
+```
+We recover $\Theta$ very well alongside $\Lambda$, here processed to align with the truth.
+
+
+## Model performance ($\Theta$)
+
+```{r model-display-the-1b, fig.align='center', fig.height=2.75, fig.width=4.5, echo=F, warning=F}
+p1 <- bs3fa::plot_matrix(res_clean$Theta_low, type="Theta", tit="Lower 2.5%", include_legend=F)
+p2 <- bs3fa::plot_matrix(res_clean$Theta_upp, type="Theta", tit="Upper 97.5%", include_legend=F)
+gridExtra::grid.arrange(p1, p2, nrow = 1)
+```
+The interval estimates we recover for these parameters are very tight, and usually contain the true values.
+
+## Model performance ($\Lambda$)
+
+```{r model-display-lam-1, fig.align='center', fig.height=2.75, fig.width=4.5, echo=F, warning=F}
+p1 <- bs3fa::plot_matrix(dat$Lambda_true*res$norm_rescale, type="Lambda", tit="Truth", include_legend=F)
+p2 <- bs3fa::plot_matrix(res_clean$Lambda, type="Lambda", tit="Estimate", include_legend=F)
+gridExtra::grid.arrange(p1, p2, nrow = 1, widths = c(3/9,6/9))
+```
+Here our $\Lambda$ estimate has been aligned with the truth. This realignment does not affect the estimates of identifiable elements.
+
+## Model performance ($\Lambda$)
+
+```{r model-display-lam-1b, fig.align='center', fig.height=2.75, fig.width=4.5, echo=F, warning=F}
+p1 <- bs3fa::plot_matrix(res_clean$Lambda_low, type="Lambda", tit="Lower 2.5%", include_legend=F)
+p2 <- bs3fa::plot_matrix(res_clean$Lambda_upp, type="Lambda", tit="Upper 97.5%", include_legend=F)
+gridExtra::grid.arrange(p1, p2, nrow = 1)
+```
+The interval estimates for $\Lambda$ are similarly exact.
+
+## Model performance ($\Lambda$)
+
+```{r model-display-lam-2, fig.align='center', fig.height=2.75, fig.width=4.5, echo=F, warning=F}
+bs3fa::plot_Lambda_mod_tru(Lambda_low=res_clean$Lambda_low, Lambda=res_clean$Lambda,
+            Lambda_upp=res_clean$Lambda_upp,
+            Lambda_true=dat$Lambda_true*res$norm_rescale,
+            doses=dat$doses, inds=1:3)
+```
+Here are the smooth curves corresponding to this $\Lambda$ estimate.
+
+## Moving to chemical ``distance'' and prediction
+
+- Recall 
+\begin{equation*}
+\def\sss{\scriptscriptstyle}
+\setstackgap{L}{8pt}
+\def\stacktype{L}
+\stackunder{Y_i}{\sss D\times 1} =  \stackunder{\Lambda}{\sss D\times K\text{ }}
+\stackunder{\eta_i}{\sss K\times 1} + \stackunder{\varepsilon_i}{\sss D\times 1}, \quad \stackunder{X_i}{\sss S\times 1} =  \stackunder{\Theta}{\sss S\times K\text{ }}
+\stackunder{\eta_i}{\sss K\times 1} + \stackunder{\Xi}{\sss S\times J\text{ }}
+\stackunder{\nu_i}{\sss J\times 1} + \stackunder{\mathrm{e}_i}{\sss S\times 1}.
+\end{equation*} \vfill
+
+- Toxicity ``distance'' between chemicals $i$ and $j$ can be represented in the shared factor space (i.e., how far apart the two vectors $\eta_i$ and $\eta_j$ are) \vfill
+
+- Two chemicals that are very close in this space will have similar dose-response curves, and similar toxicity-relevant features \vfill
+
+- They may not have similar toxicity-irrelevant features
+
+## Model performance ($\eta$)
+
+```{r model-display-eta-1, fig.align='center', fig.height=2.75, fig.width=4.5, echo=F, warning=F}
+qplot(c(dat$eta_true), c(res_clean$eta[1:K,]), geom="point", alpha=0.2, show.legend = F) +
+  xlab(expression(True~eta)) + ylab(expression(Predicted~eta)) + 
+  geom_abline(intercept=0, slope=1, color="red") + 
+  theme_minimal() + theme_bw()
+```
+We show high predictive power for the latent factors
+
+## Model performance (distance)
+
+```{r model-display-dist, fig.align='center', fig.height=2.75, fig.width=4.5, echo=F, warning=F}
+dist_tru = c(dist(t(dat$eta_true)))
+dist_mod = c(dist(t(res_clean$eta[1:K,])))
+samp_inds = sample(1:length(dist_tru), 5*1e2) # sample for plotting purposes
+qplot(dist_tru, dist_mod, geom="point", alpha=0.8, show.legend = F) +
+  xlab("True distance") + ylab(expression("Predicted distance")) + 
+  geom_abline(intercept=0, slope=1, color="red") + 
+  theme_minimal() + theme_bw()
+```
+We also show high predictive power for the simulated chemical distances
+
+## Model performance (prediction)
+
+\small
+```{r model-get-pred}
+# Turn Lambda and eta samples into Lambda * eta 
+# (i.e., the predicted dose response curve)
+res_pred = pred_drcurve(Lambda_mod=res$Lambda_save, 
+                        eta_mod=res$eta_save, 
+                        rescale=res$norm_rescale)
+```
+
+```{r model-display-pred, fig.align='center', fig.height=2.25, fig.width=4.5, echo=F, warning=F}
+# Display random two example unobserved curves
+miss_ex = not_obs[sample(1:length(not_obs),2)] # Pick two unobserved curves
+bs3fa::plot_Lambda_mod_tru(Lambda_low=res_pred$dr_low, Lambda=res_pred$dr_est,
+            Lambda_upp=res_pred$dr_upp,
+            Lambda_true=dat$true_curve,
+            doses=dat$doses, inds=miss_ex, 
+            ylab_head="response", title_head="Y",
+            mean_curve=dat$avg_dose_resp)
+```
+
+## Other capabilities
+
+- Variables in $X$ can be continuous, count, or binary \vfill
+- Multiple observations per dose are allowed \vfill
+- Unique dose levels need not be evenly spaced \vfill
+- Chemicals in real data number in the thousands and features number in the hundreds \vfill
+- Quick glimpse of real data results now!
