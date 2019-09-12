@@ -19,7 +19,8 @@ simulate_lambda_column <- function(p, j){ # p is dimension of data, j is column 
 }
 
 simulate_data <- function(N,D,S,K,J,std_error_y,std_error_x,prob_miss=0,real_Y=NULL,prob_rep=0,prop_zero=0,
-                          gp_ls=0.3, gp_nv=1, gp_nug=1e-6, sample_real=NULL, wt_xfacs=1, taper_lam=F){
+                          gp_ls=0.3, gp_nv=1, gp_nug=1e-6, sample_real=NULL, wt_xfacs=1, taper_lam=NULL,
+                          X_type=rep("continuous",S)){
   # Load packages
   library(mvtnorm) # Use for multivariate normal sampling
   library(sparseEigen) # Use to make sparse orthogonal matrix.
@@ -31,7 +32,6 @@ simulate_data <- function(N,D,S,K,J,std_error_y,std_error_x,prob_miss=0,real_Y=N
     obs_tmp=t( mvtnorm::rmvnorm(n=K, mean=avg_dose_resp, sigma=get_sqexp_kernel(dvec_unique, gp_ls, gp_nv, gp_nug)) )
     svd_tmp = svd(t(obs_tmp))
     Lambda_true = as.matrix(svd_tmp$v[,1:K])
-    if( taper_lam ){ taper = svd_tmp$d }
     #plot(Lambda_true, type="l")
     if( !is.null(sample_real) ){
       print('Warning: sample_real set to a number, but no real data provided. Need to provide real_Y to use.')
@@ -53,12 +53,13 @@ simulate_data <- function(N,D,S,K,J,std_error_y,std_error_x,prob_miss=0,real_Y=N
     Y_smooth = scale(Y_smooth, scale=FALSE) # subtract average curve from data
     svd_y = svd(Y_smooth)
     Lambda_true = as.matrix(svd_y$v[,1:K])
-    if( taper_lam ){ taper = svd_y$d }
   }
   Lambda_true=normalize_and_rotate(Lambda_true)
-  if( taper_lam ){
-    for(j in 1:ncol(Lambda_true)){
-      Lambda_true[,j] = Lambda_true[,j]*svd_y$d[j]
+  if( !is.null(taper_lam) ){
+    # Make max 1 and scale others relative to max, sort decreasing
+    taper_lam = sort(taper_lam/max(taper_lam), decreasing=T)
+    for(k in 1:K){
+      Lambda_true[,k] = Lambda_true[,k]*taper_lam[k]
     }
   }
   eta_true=matrix(rnorm(K*N), nrow=K, ncol=N)
@@ -109,10 +110,27 @@ simulate_data <- function(N,D,S,K,J,std_error_y,std_error_x,prob_miss=0,real_Y=N
   # Get X itself
   X = Theta_true %*% eta_true + wt_xfacs * xi_true %*% nu_true + e_x
   colnames(X) = 1:N
+  
+  # Round depending on X_type variable
+  # "continuous", "binary", "count"
+  if( !(length(X_type)==S) ){print('Warning: Need length(X_type) equal to S.')}
+  for(s in 1:S){
+    type_tmp = X_type[s]
+    if(type_tmp=="continuous"){
+      # Do nothing
+    } else if(type_tmp=="binary"){
+      X[s,] = 1*(X[s,]>0)
+    } else if(type_tmp=="count"){
+      X[s,(X[s,]==0)] = 0
+      X[s,] = round(5*X[s,])
+    } else{
+      print('Warning: Need X_type to only contain "continuous", "binary", "count".')
+    }
+  }
 
   dat_list = list("X"=X,"Y"=Y,"eta_true"=eta_true,"Lambda_true"=Lambda_true,"e_y"=e_y,
                   "Theta_true"=Theta_true,"xi_true"=xi_true,"nu_true"=nu_true,"e_x"=e_x,
                   "avg_dose_resp"=avg_dose_resp,"K"=K,"J"=J,"doses"=doses_long, 
-                  "true_curve"=true_curve)
+                  "true_curve"=true_curve, "X_type"=X_type)
   return(dat_list)
 }
