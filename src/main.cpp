@@ -27,6 +27,13 @@ double rnormArma(double mu, double sig_sq) {
   return mu + pow(sig_sq, 0.5) * arma::randn( );
 }
 
+//[[Rcpp::export]]
+bool is_inf( double x){
+  /* 
+   * General function for determining whether a value is infinite.
+   */
+  return traits::is_infinite<REALSXP>(x);
+}
 
 /* *********** ERROR SAMPLING FUNCTIONS *********** 
 * 
@@ -857,15 +864,15 @@ Rcpp::List sample_X(std::vector< std::string > type, arma::mat X_original, arma:
         if( conti.compare(type[s]) != 0 ){ // If variable s is binary.
           if( Xsi_original==0 ){
             X_samp(i) = r_truncnorm(E_Xs[i], sig_xs, -inf, 0);
-            if( isinf(X_samp(i)) ){ X_samp(i)=-50; inf_s=inf_s+1; }
+            if( is_inf(X_samp(i)) ){ X_samp(i)=-50; inf_s=inf_s+1; }
           } else{
             X_samp(i) = r_truncnorm(E_Xs[i], sig_xs, 0, inf);
-            if( isinf(X_samp(i)) ){ X_samp(i)=50; inf_s=inf_s+1; }
+            if( is_inf(X_samp(i)) ){ X_samp(i)=50; inf_s=inf_s+1; }
           }
         } else{ // If variable s is count.
           if( Xsi_original==0 ){
             X_samp(i) = r_truncnorm(E_Xs[i], sig_xs, -inf, 0);
-            if( isinf(X_samp(i)) ){ X_samp(i)=-50; inf_s=inf_s+1; }
+            if( is_inf(X_samp(i)) ){ X_samp(i)=-50; inf_s=inf_s+1; }
           } else{
             X_samp(i) = r_truncnorm(E_Xs[i], sig_xs, Xsi_original-1, Xsi_original);
           }
