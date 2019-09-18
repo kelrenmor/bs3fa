@@ -5,6 +5,10 @@ rnormArma <- function(mu, sig_sq) {
     .Call(`_bs3fa_rnormArma`, mu, sig_sq)
 }
 
+is_inf <- function(x) {
+    .Call(`_bs3fa_is_inf`, x)
+}
+
 sample_sigsq_p <- function(a_sig, b_sig, N, RSS) {
     .Call(`_bs3fa_sample_sigsq_p`, a_sig, b_sig, N, RSS)
 }

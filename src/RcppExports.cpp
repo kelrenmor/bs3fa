@@ -18,6 +18,17 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// is_inf
+bool is_inf(double x);
+RcppExport SEXP _bs3fa_is_inf(SEXP xSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< double >::type x(xSEXP);
+    rcpp_result_gen = Rcpp::wrap(is_inf(x));
+    return rcpp_result_gen;
+END_RCPP
+}
 // sample_sigsq_p
 double sample_sigsq_p(double a_sig, double b_sig, int N, double RSS);
 RcppExport SEXP _bs3fa_sample_sigsq_p(SEXP a_sigSEXP, SEXP b_sigSEXP, SEXP NSEXP, SEXP RSSSEXP) {
@@ -457,6 +468,7 @@ END_RCPP
 
 static const R_CallMethodDef CallEntries[] = {
     {"_bs3fa_rnormArma", (DL_FUNC) &_bs3fa_rnormArma, 2},
+    {"_bs3fa_is_inf", (DL_FUNC) &_bs3fa_is_inf, 1},
     {"_bs3fa_sample_sigsq_p", (DL_FUNC) &_bs3fa_sample_sigsq_p, 4},
     {"_bs3fa_sample_sigsq_x", (DL_FUNC) &_bs3fa_sample_sigsq_x, 4},
     {"_bs3fa_sample_sigsq_y", (DL_FUNC) &_bs3fa_sample_sigsq_y, 5},
