@@ -6,7 +6,7 @@
 
 # Installing the package
 
-After downloading and installing **R** (if necessary) run the following from within **R**:
+After downloading and installing **R** (if necessary) and Rtools (if installing on a Windows machine) run the following from within **R**:
 ```
 # Install packages required by bs3fa
 install.packages(c("remotes", "Rcpp", "abind", "pracma", "sparseEigen", 
