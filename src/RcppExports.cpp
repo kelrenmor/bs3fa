@@ -6,6 +6,30 @@
 
 using namespace Rcpp;
 
+// get_covDD2
+arma::mat get_covDD2(arma::vec d_vec, double l);
+RcppExport SEXP _bs3fa_get_covDD2(SEXP d_vecSEXP, SEXP lSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< arma::vec >::type d_vec(d_vecSEXP);
+    Rcpp::traits::input_parameter< double >::type l(lSEXP);
+    rcpp_result_gen = Rcpp::wrap(get_covDD2(d_vec, l));
+    return rcpp_result_gen;
+END_RCPP
+}
+// test
+double test(arma::vec d_vec, double l);
+RcppExport SEXP _bs3fa_test(SEXP d_vecSEXP, SEXP lSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< arma::vec >::type d_vec(d_vecSEXP);
+    Rcpp::traits::input_parameter< double >::type l(lSEXP);
+    rcpp_result_gen = Rcpp::wrap(test(d_vec, l));
+    return rcpp_result_gen;
+END_RCPP
+}
 // rnormArma
 double rnormArma(double mu, double sig_sq);
 RcppExport SEXP _bs3fa_rnormArma(SEXP muSEXP, SEXP sig_sqSEXP) {
@@ -467,6 +491,8 @@ END_RCPP
 }
 
 static const R_CallMethodDef CallEntries[] = {
+    {"_bs3fa_get_covDD2", (DL_FUNC) &_bs3fa_get_covDD2, 2},
+    {"_bs3fa_test", (DL_FUNC) &_bs3fa_test, 2},
     {"_bs3fa_rnormArma", (DL_FUNC) &_bs3fa_rnormArma, 2},
     {"_bs3fa_is_inf", (DL_FUNC) &_bs3fa_is_inf, 1},
     {"_bs3fa_sample_sigsq_p", (DL_FUNC) &_bs3fa_sample_sigsq_p, 4},

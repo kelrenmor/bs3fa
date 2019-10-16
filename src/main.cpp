@@ -518,7 +518,7 @@ arma::mat get_covDD(arma::vec d_vec, double l){
     for( int j=(i+1); j<D; j++ ){
       double d1 = d_vec(i);
       double d2 = d_vec(j);
-      double tmp_cov = exp(-0.5*inv_lsq*pow(abs(d1-d2),1.9999)); // vs. 2.0 for numeric stability
+      double tmp_cov = exp(-0.5*inv_lsq*pow(fabs(d1-d2),1.9999)); // vs. 2.0 for numeric stability
       covDD(i, j) = tmp_cov;
       covDD(j, i) = tmp_cov;
     }
