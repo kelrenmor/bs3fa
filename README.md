@@ -16,6 +16,20 @@ install.packages(c("remotes", "Rcpp", "abind", "pracma", "sparseEigen",
 remotes::install_github("kelrenmor/bs3fa", quiet=T, upgrade=T, dependencies=T)
 ```
 
+A workaround to the above involves downloading the repository to one's local machine and sourcing the files containing the functions provided in the package. Upon downloading the package, run the following:
+
+```
+setwd('/path/to/repo/bs3fa/') # set this to the full path of bs3fa
+
+library(R.utils)
+library(Rcpp)
+library(RcppArmadillo)
+
+sourceDirectory("R")
+sourceCpp("src/main.cpp")
+sourceCpp("src/msf.cpp")
+```
+
 # What's in this repository
 
 The [R](R) directory contains R functions available in this package, including `run_bs3fa()` (the main model sampler), `run_fpca()` (the sampler for Y-only smooth factor analysis), and the post-processing functions used to resolve rotational ambiguity.
