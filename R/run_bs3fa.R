@@ -103,7 +103,10 @@ run_bs3fa <- function(X, Y, K, J, X_type=rep("continuous", nrow(X)), dvec_unique
       X_type[s] = "binary"
     }
   }
-  cond = !(num_un==1); X = X[cond,]; X_type = X_type[cond]
+  cond = !(num_un==1)
+  X = X[cond,]
+  if(sum(cond)==1){ X=matrix(X,nrow=1) }
+  X_type = X_type[cond]
   S = nrow(X) # Now save row dimension of X (i.e., no of features)
   if( sum(!cond) > 0 ){print(paste(sum(!cond),"X variables have no variation, removed."))}
   not_cont = !(X_type=="continuous")
@@ -286,6 +289,7 @@ run_bs3fa <- function(X, Y, K, J, X_type=rep("continuous", nrow(X)), dvec_unique
     Omega_rotated = mcrotfact(split.along.dim(Omega_save,3), file=FALSE, ret='both')
     Omega_save = abind(Omega_rotated$samples, along=3)
     Lambda_save = Omega_save[1:D,,]; Theta_save = Omega_save[(D+1):(D+S),,]
+    if(S==1){ Theta_save=array(Theta_save, dim=c(S,K,nsamps_save)) }
     # Apply inverse rotation to eta so Lam * eta remains unchanged by Lam rotation
     eta_save = invrot(split.along.dim(eta_save,3), Omega_rotated$rots)
     # Fix possible label/sign switching ambiguity.
