@@ -336,19 +336,20 @@ run_bs3fa <- function(X, Y, K, J, X_type=rep("continuous", nrow(X)), dvec_unique
   }
   
   ##### Get out predicted mean and 95% credible interval for Y (on original scale if specified)
-  Y_pred = array(0, dim=c(dim(Lambda_save)[1],dim(eta_save)[2],nsamps_save))
-  for(i in 1:nsamps_save){ Y_pred[,,i] = Lambda_save[,,i] %*% eta_save[,,i] / ifelse(return_original_scale,norm_rescale,1) }
-  Y_mean = apply(Y_pred,c(1,2),mean)
-  Y_ll = apply(Y_pred,c(1,2),function(x) quantile(x, 0.025))
-  Y_ul = apply(Y_pred,c(1,2),function(x) quantile(x, 0.975))
+  Y_mean = apply(DRcurve_save,c(1,2),mean)/ifelse(return_original_scale,norm_rescale,1) # Rao-blackwell
+  Y_ll = apply(Y_save,c(1,2),function(x) quantile(x, 0.025))/ifelse(return_original_scale,norm_rescale,1)
+  Y_ul = apply(Y_save,c(1,2),function(x) quantile(x, 0.975))/ifelse(return_original_scale,norm_rescale,1)
+  DR_ll = apply(DRcurve_save,c(1,2),function(x) quantile(x, 0.025))/ifelse(return_original_scale,norm_rescale,1)
+  DR_ul = apply(DRcurve_save,c(1,2),function(x) quantile(x, 0.975))/ifelse(return_original_scale,norm_rescale,1)
   
   ##### Save everything in a list and return said list.
   res = list("Theta_save"=Theta_save, "Lambda_save"=Lambda_save, "eta_save"=eta_save, 
              "Xi_save" = xi_save, "nu_save" = nu_save, "sigsq_y_save"=sigsq_y_save, "sigsq_x_save"=sigsq_x_save,
-             "Y_save"=Y_save, "dvec_unique"=dvec_unique, "dvec_unique_original"=dvec_unique_original, 
+             "dvec_unique"=dvec_unique, "dvec_unique_original"=dvec_unique_original, 
              "l"=l, "covDD"=covDD, "Y"=Y, "X"=X, "X_save"=X_save, "not_cont_X_vars"=not_cont,
              "norm_rescale"=norm_rescale, "kept_X_vars_original"=cond, "return_original_scale"=return_original_scale,
-             "DRcurve_save"=DRcurve_save, "Y_mean"=Y_mean, "Y_ll"=Y_ll, "Y_ul"=Y_ll, 
+             "DRcurve_save"=DRcurve_save, "DR_ll"=DR_ll, "DR_ul"=DR_ul,
+             "Y_save"=Y_save, "Y_mean"=Y_mean, "Y_ll"=Y_ll, "Y_ul"=Y_ul, 
              "Lambda_mean"=Lambda_mean, "Theta_mean"=Theta_mean, "eta_mean"=eta_mean, 
              "Xi_mean"=Xi_mean, "nu_mean"=nu_mean,
              "S"=S, "D"=D, "K"=K, "J"=J)
