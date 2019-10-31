@@ -157,7 +157,7 @@ run_bs3fa <- function(X, Y, K, J, X_type=rep("continuous", nrow(X)), dvec_unique
   nu_save = array(NA, dim=c(J,N,nsamps_save))
   sigsq_y_save = matrix(NA, nrow=D, ncol=nsamps_save)
   sigsq_x_save = matrix(NA, nrow=S, ncol=nsamps_save)
-  Y_save = array(NA, dim=c(D,N,nsamps_save))
+  Y_save = DRcurve_save = array(NA, dim=c(D,N,nsamps_save))
   X_save = array(NA, dim=c(S,N,nsamps_save))
   
   ##### Run sampler
@@ -278,6 +278,7 @@ run_bs3fa <- function(X, Y, K, J, X_type=rep("continuous", nrow(X)), dvec_unique
       sigsq_y_save[,ind] = sigsq_y_vec
       sigsq_x_save[,ind] = sigsq_x_vec
       Y_save[,,ind] = sample_Y_miss(Lambda, eta, sigsq_y_vec, Y, all_nobs_mat)
+      DRcurve_save[,,ind] = Lambda %*% eta / ifelse(return_original_scale,norm_rescale,1)
       X_save[not_cont,,ind] = Z[not_cont,] # only save sampled X vals
       ind = ind + 1
     }
@@ -347,7 +348,7 @@ run_bs3fa <- function(X, Y, K, J, X_type=rep("continuous", nrow(X)), dvec_unique
              "Y_save"=Y_save, "dvec_unique"=dvec_unique, "dvec_unique_original"=dvec_unique_original, 
              "l"=l, "covDD"=covDD, "Y"=Y, "X"=X, "X_save"=X_save, "not_cont_X_vars"=not_cont,
              "norm_rescale"=norm_rescale, "kept_X_vars_original"=cond, "return_original_scale"=return_original_scale,
-             "Y_mean"=Y_mean, "Y_ll"=Y_ll, "Y_ul"=Y_ll, 
+             "DRcurve_save"=DRcurve_save, "Y_mean"=Y_mean, "Y_ll"=Y_ll, "Y_ul"=Y_ll, 
              "Lambda_mean"=Lambda_mean, "Theta_mean"=Theta_mean, "eta_mean"=eta_mean, 
              "Xi_mean"=Xi_mean, "nu_mean"=nu_mean,
              "S"=S, "D"=D, "K"=K, "J"=J)
