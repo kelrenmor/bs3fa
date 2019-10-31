@@ -5,8 +5,9 @@ run_bs3fa <- function(X, Y, K, J, X_type=rep("continuous", nrow(X)), dvec_unique
                       fr_normalize=T, random_init=T, homo_Y=T, print_progress=T, scale_X=T,
                       a1_delta_xi=2.1, a1_delta_om=2.1, a2_delta_xi=3.1, a2_delta_om=3.1,
                       a_sig_y=1, b_sig_y=1, a_sig_x=1, b_sig_x=1,
-                      bad_samp_tol=nsamps_save, debug=F, sigsq_Y_fixed=NULL){
-
+                      bad_samp_tol=nsamps_save, debug=F, sigsq_Y_fixed=NULL,
+                      return_original_scale=F){
+  
   # X - S x N chemical feature matrix, where S is the number of features and N is the no of obs.
   #     If Y is provided in 'long' format colnames(X) must give IDs used for Y.
   # Y - D x N dose response curve matrix, where S is the number of doses and N is the no of obs.
@@ -42,7 +43,8 @@ run_bs3fa <- function(X, Y, K, J, X_type=rep("continuous", nrow(X)), dvec_unique
   # bad_samp_tol - Total number of bad_samps before killing sampler.
   # debug - For internal debugging, will print when Lambda sample is bad.
   # sigsq_Y_fixed - Default NULL, but to fix sigsq_Y_vec set to numeric value.
-
+  # return_original_scale - Whether to return values back in their original scale or internally rescaled form.
+  
   # Load libraries and Cpp functions
   library(abind)
   
@@ -254,11 +256,11 @@ run_bs3fa <- function(X, Y, K, J, X_type=rep("continuous", nrow(X)), dvec_unique
     eta = sample_eta_all(Y, Z, xi, nu, Lambda, Theta, sigsq_y_vec, sigsq_x_vec, obs_Y)
     
     ##### Sample error terms #####
-    
+
     # Error terms for Y
     Y_min_mu = get_Y_min_mu(Y, Lambda, eta)
     if(is.null(sigsq_Y_fixed)){
-      sigsq_y_vec = sample_sigsq_y(a_sig_y, b_sig_y, Y_min_mu, obs_Y, homo_Y)
+      sigsq_y_vec = sample_sigsq_y(a_sig_y, norm_rescale^2 * b_sig_y, Y_min_mu, obs_Y, homo_Y)
     } else{
       sigsq_y_vec = matrix(rep(norm_rescale^2 * sigsq_Y_fixed, D))
     }
@@ -283,7 +285,10 @@ run_bs3fa <- function(X, Y, K, J, X_type=rep("continuous", nrow(X)), dvec_unique
   }
   
   if( post_process & (K>1) ){
+    
     if( print_progress ){print("Done sampling, beginning post-processing.")}
+    
+    ### Correct ambiguity for joint components
     # Correct rotational ambiguity.
     Omega_save = abind(Lambda_save, Theta_save, along=1)
     Omega_rotated = mcrotfact(split.along.dim(Omega_save,3), file=FALSE, ret='both')
@@ -299,28 +304,53 @@ run_bs3fa <- function(X, Y, K, J, X_type=rep("continuous", nrow(X)), dvec_unique
     Lambda_save = abind(applier(split.along.dim(Lambda_save,3), permsignList), along=3)
     # Double t in two lapply calls since eta transposed relative to Lambda and Theta
     eta_save = abind(lapply(applier(lapply(eta_save, t), permsignList), t), along=3) 
-    # Get out predicted mean for Lambda, and eta
-    Lambda_mean = apply(Lambda_save,c(1,2),mean)
+    # Get out predicted mean for Lambda (on original scale if specified), eta, and Theta
+    Theta_mean = apply(Theta_save,c(1,2),mean)
+    Lambda_mean = apply(Lambda_save,c(1,2),mean) / ifelse(return_original_scale,norm_rescale,1)
     eta_mean = apply(eta_save,c(1,2),mean)
+    
+    ### Correct ambiguity for X-specific components
+    # Correct rotational ambiguity.
+    Xi_rotated = mcrotfact(split.along.dim(xi_save,3), file=FALSE, ret='both')
+    xi_save = abind(Xi_rotated$samples, along=3)
+    if(S==1){ xi_save=array(xi_save, dim=c(S,J,nsamps_save)) }
+    # Apply inverse rotation to nu so Xi * nu remains unchanged by Xi rotation
+    nu_save = invrot(split.along.dim(nu_save,3), Xi_rotated$rots)
+    # Fix possible label/sign switching ambiguity.
+    pivot = Xi_rotated$samples[[ round( length(Xi_rotated$samples)/2 ) ]]
+    permsignList = lapply(Xi_rotated$samples, msfOUT, pivot)
+    xi_save = abind(applier(split.along.dim(xi_save,3), permsignList), along=3)
+    # Double t in two lapply calls since eta transposed relative to Lambda and Theta
+    nu_save = abind(lapply(applier(lapply(nu_save, t), permsignList), t), along=3) 
+    # Get out predicted mean for Lambda (on original scale if specified), eta, and Theta
+    Xi_mean = apply(xi_save,c(1,2),mean)
+    nu_mean = apply(nu_save,c(1,2),mean)
   } else{
     if( print_progress ){print("Done sampling, no post-processing performed.")}
+    Theta_mean = 'Theta not identifiable, posterior mean not calculated'
     Lambda_mean = 'Lambda not identifiable, posterior mean not calculated'
     eta_mean = 'eta not identifiable, posterior mean not calculated'
+    Xi_mean = 'Xi not identifiable, posterior mean not calculated'
+    nu_mean = 'nu not identifiable, posterior mean not calculated'
   }
   
-  ##### Get out predicted mean for Y, Lambda, and eta
-  Y_mean = matrix(0, nrow=dim(Lambda_save)[1], ncol=dim(eta_save)[2])
-  for(i in 1:nsamps_save){ Y_mean = Y_mean + Lambda_save[,,i] %*% eta_save[,,i] }
-  Y_mean = Y_mean/(nsamps_save)
+  ##### Get out predicted mean and 95% credible interval for Y (on original scale if specified)
+  Y_pred = array(0, dim=c(dim(Lambda_save)[1],dim(eta_save)[2],nsamps_save))
+  for(i in 1:nsamps_save){ Y_pred[,,i] = Lambda_save[,,i] %*% eta_save[,,i] / ifelse(return_original_scale,norm_rescale,1) }
+  Y_mean = apply(Y_pred,c(1,2),mean)
+  Y_ll = apply(Y_pred,c(1,2),function(x) quantile(x, 0.025))
+  Y_ul = apply(Y_pred,c(1,2),function(x) quantile(x, 0.975))
   
   ##### Save everything in a list and return said list.
   res = list("Theta_save"=Theta_save, "Lambda_save"=Lambda_save, "eta_save"=eta_save, 
-             "sigsq_y_save"=sigsq_y_save, "sigsq_x_save"=sigsq_x_save,
+             "Xi_save" = xi_save, "nu_save" = nu_save, "sigsq_y_save"=sigsq_y_save, "sigsq_x_save"=sigsq_x_save,
              "Y_save"=Y_save, "dvec_unique"=dvec_unique, "dvec_unique_original"=dvec_unique_original, 
              "l"=l, "covDD"=covDD, "Y"=Y, "X"=X, "X_save"=X_save, "not_cont_X_vars"=not_cont,
-             "norm_rescale"=norm_rescale, "kept_X_vars_original"=cond,
-             "Y_mean"=Y_mean, "Lambda_mean"=Lambda_mean, "eta_mean"=eta_mean,
+             "norm_rescale"=norm_rescale, "kept_X_vars_original"=cond, "return_original_scale"=return_original_scale,
+             "Y_mean"=Y_mean, "Y_ll"=Y_ll, "Y_ul"=Y_ll, 
+             "Lambda_mean"=Lambda_mean, "Theta_mean"=Theta_mean, "eta_mean"=eta_mean, 
+             "Xi_mean"=Xi_mean, "nu_mean"=nu_mean,
              "S"=S, "D"=D, "K"=K, "J"=J)
   return(res)
-
+  
 }
