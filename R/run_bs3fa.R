@@ -266,7 +266,7 @@ run_bs3fa <- function(X, Y, K, J, X_type=rep("continuous", nrow(X)), dvec_unique
     }
     # Error terms for X
     X_min_mu = get_X_min_mu(Z, Theta, eta, xi, nu)
-    sigsq_x_vec = sample_sigsq_x(a_sig_x, b_sig_y, X_min_mu, X_type)
+    sigsq_x_vec = sample_sigsq_x(a_sig_x, b_sig_x, X_min_mu, X_type)
     
     ##### Save samples #####
     if( ss>burnin & ss%%thin==0 ){
