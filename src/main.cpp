@@ -96,8 +96,8 @@ arma::vec sample_sigsq_y(double a_sig, double b_sig, arma::mat D_min_mu,
       for(int i=0; i<N; i++){
         double obs_Y_p_i = obs_Y_p(i);
         if( obs_Y_p_i>0 ){ // If you observe 1 or more response values for chem i with dose d.
-          RSS += pow(D_min_mu_p(i), 2.0);
-          N_obs += 1.0/obs_Y_p_i; // FIXME I think this is right, but need to write it out.
+          RSS += obs_Y_p_i * pow(D_min_mu_p(i), 2.0);
+          N_obs += 1.0;
         }
       }
     }
