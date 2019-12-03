@@ -73,7 +73,7 @@ run_bs3fa <- function(X, Y, K, J, X_type=rep("continuous", nrow(X)), dvec_unique
     for(i in 1:length(IDs)){
       id = IDs[i]
       ind_tmp = which(IDs_y == id)
-      IDs_long[ind_tmp] = (id-1) # for C++ indexing
+      IDs_long[ind_tmp] = (as.numeric(as.character(id))-1) # for C++ indexing
       doses_tmp = Y[ind_tmp,2]
       resps_tmp = Y[ind_tmp,3]
       for(d in 1:D){

@@ -56,7 +56,7 @@ run_fpca <- function(Y, K, dvec_unique=1:nrow(Y), post_process=T, Y_format='long
     for(i in 1:length(IDs)){
       id = IDs[i]
       ind_tmp = which(IDs_y == id)
-      IDs_long[ind_tmp] = (id-1) # for C++ indexing
+      IDs_long[ind_tmp] = (as.numeric(as.character(id))-1) # for C++ indexing
       doses_tmp = Y[ind_tmp,2]
       resps_tmp = Y[ind_tmp,3]
       for(d in 1:D){
