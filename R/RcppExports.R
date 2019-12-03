@@ -21,8 +21,16 @@ sample_sigsq_y <- function(a_sig, b_sig, D_min_mu, obs_Y, homo_var) {
     .Call(`_bs3fa_sample_sigsq_y`, a_sig, b_sig, D_min_mu, obs_Y, homo_var)
 }
 
+sample_sigsq_longy <- function(a_sig, b_sig, D_min_mu_long, dind_long, homo_var, P) {
+    .Call(`_bs3fa_sample_sigsq_longy`, a_sig, b_sig, D_min_mu_long, dind_long, homo_var, P)
+}
+
 get_X_min_mu <- function(X, Theta, eta, xi, nu) {
     .Call(`_bs3fa_get_X_min_mu`, X, Theta, eta, xi, nu)
+}
+
+get_Y_min_mu_long <- function(Y_long, Lambda, eta, IDs_long, dind_long) {
+    .Call(`_bs3fa_get_Y_min_mu_long`, Y_long, Lambda, eta, IDs_long, dind_long)
 }
 
 get_Y_min_mu <- function(Y, Lambda, eta) {

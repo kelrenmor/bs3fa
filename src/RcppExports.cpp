@@ -72,6 +72,22 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// sample_sigsq_longy
+arma::vec sample_sigsq_longy(double a_sig, double b_sig, arma::vec D_min_mu_long, arma::vec dind_long, bool homo_var, int P);
+RcppExport SEXP _bs3fa_sample_sigsq_longy(SEXP a_sigSEXP, SEXP b_sigSEXP, SEXP D_min_mu_longSEXP, SEXP dind_longSEXP, SEXP homo_varSEXP, SEXP PSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< double >::type a_sig(a_sigSEXP);
+    Rcpp::traits::input_parameter< double >::type b_sig(b_sigSEXP);
+    Rcpp::traits::input_parameter< arma::vec >::type D_min_mu_long(D_min_mu_longSEXP);
+    Rcpp::traits::input_parameter< arma::vec >::type dind_long(dind_longSEXP);
+    Rcpp::traits::input_parameter< bool >::type homo_var(homo_varSEXP);
+    Rcpp::traits::input_parameter< int >::type P(PSEXP);
+    rcpp_result_gen = Rcpp::wrap(sample_sigsq_longy(a_sig, b_sig, D_min_mu_long, dind_long, homo_var, P));
+    return rcpp_result_gen;
+END_RCPP
+}
 // get_X_min_mu
 arma::mat get_X_min_mu(arma::mat X, arma::mat Theta, arma::mat eta, arma::mat xi, arma::mat nu);
 RcppExport SEXP _bs3fa_get_X_min_mu(SEXP XSEXP, SEXP ThetaSEXP, SEXP etaSEXP, SEXP xiSEXP, SEXP nuSEXP) {
@@ -84,6 +100,21 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< arma::mat >::type xi(xiSEXP);
     Rcpp::traits::input_parameter< arma::mat >::type nu(nuSEXP);
     rcpp_result_gen = Rcpp::wrap(get_X_min_mu(X, Theta, eta, xi, nu));
+    return rcpp_result_gen;
+END_RCPP
+}
+// get_Y_min_mu_long
+arma::vec get_Y_min_mu_long(arma::vec Y_long, arma::mat Lambda, arma::mat eta, arma::ivec IDs_long, arma::ivec dind_long);
+RcppExport SEXP _bs3fa_get_Y_min_mu_long(SEXP Y_longSEXP, SEXP LambdaSEXP, SEXP etaSEXP, SEXP IDs_longSEXP, SEXP dind_longSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< arma::vec >::type Y_long(Y_longSEXP);
+    Rcpp::traits::input_parameter< arma::mat >::type Lambda(LambdaSEXP);
+    Rcpp::traits::input_parameter< arma::mat >::type eta(etaSEXP);
+    Rcpp::traits::input_parameter< arma::ivec >::type IDs_long(IDs_longSEXP);
+    Rcpp::traits::input_parameter< arma::ivec >::type dind_long(dind_longSEXP);
+    rcpp_result_gen = Rcpp::wrap(get_Y_min_mu_long(Y_long, Lambda, eta, IDs_long, dind_long));
     return rcpp_result_gen;
 END_RCPP
 }
@@ -472,7 +503,9 @@ static const R_CallMethodDef CallEntries[] = {
     {"_bs3fa_sample_sigsq_p", (DL_FUNC) &_bs3fa_sample_sigsq_p, 4},
     {"_bs3fa_sample_sigsq_x", (DL_FUNC) &_bs3fa_sample_sigsq_x, 4},
     {"_bs3fa_sample_sigsq_y", (DL_FUNC) &_bs3fa_sample_sigsq_y, 5},
+    {"_bs3fa_sample_sigsq_longy", (DL_FUNC) &_bs3fa_sample_sigsq_longy, 6},
     {"_bs3fa_get_X_min_mu", (DL_FUNC) &_bs3fa_get_X_min_mu, 5},
+    {"_bs3fa_get_Y_min_mu_long", (DL_FUNC) &_bs3fa_get_Y_min_mu_long, 5},
     {"_bs3fa_get_Y_min_mu", (DL_FUNC) &_bs3fa_get_Y_min_mu, 3},
     {"_bs3fa_get_tau", (DL_FUNC) &_bs3fa_get_tau, 1},
     {"_bs3fa_sample_eta_all", (DL_FUNC) &_bs3fa_sample_eta_all, 9},
