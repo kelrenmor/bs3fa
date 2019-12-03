@@ -122,12 +122,62 @@ arma::vec sample_sigsq_y(double a_sig, double b_sig, arma::mat D_min_mu,
 }
 
 // [[Rcpp::export]]
+arma::vec sample_sigsq_longy(double a_sig, double b_sig, arma::vec D_min_mu_long, 
+                             arma::vec dind_long, bool homo_var, int P) {
+  /* A draw of diag(\sigma_1^2, \sigma_P^2), given 1/\sigma_p^2 ~ Ga(a_sig/2,b_sig/2),
+  * D_min_mu is the long vector of data minus its mean (each of the N_obs rows are one observation).
+  * dind_long is the N_obs vector giving the dose index at each observation of D_min_mu.
+  * homo_var says whether or not variance is homoscedastic (T) or hetero (F).
+  * 
+  */ 
+  int N_obs = D_min_mu_long.n_rows;
+  arma::vec sigsq_all(P);
+  double RSS;
+  int dind;
+  arma::vec RSS_vec(P);
+  arma::vec nobs_vec(P);
+  if( homo_var ){
+    RSS = 0.0;
+    for( int i=0; i<N_obs; i++ ){
+      RSS += pow(D_min_mu_long(i), 2.0);
+    }
+    sigsq_all.fill( sample_sigsq_p(a_sig, b_sig, N_obs, RSS) );
+  } else{
+    RSS_vec.fill(0.0);
+    nobs_vec.fill(0.0);
+    for( int i=0; i<N_obs; i++ ){
+      dind = dind_long(i);
+      RSS_vec(dind) += pow(D_min_mu_long(i), 2.0);
+      nobs_vec(dind) += 1.0;
+    }
+    for( int p=0; p<P; p++ ){
+      sigsq_all(p) = sample_sigsq_p(a_sig, b_sig, nobs_vec(p), RSS_vec(p));
+    }
+  }
+  
+  return sigsq_all;
+}
+
+// [[Rcpp::export]]
 arma::mat get_X_min_mu(arma::mat X, arma::mat Theta, arma::mat eta,
                        arma::mat xi, arma::mat nu) {
   /* Get the value of X minus its mean (given all mean params Gibbs).
   * 
   */ 
   return X - ( Theta*eta + xi*nu );
+}
+
+// [[Rcpp::export]]
+arma::vec get_Y_min_mu_long(arma::vec Y_long, arma::mat Lambda, arma::mat eta,
+                            arma::ivec IDs_long, arma::ivec dind_long) {
+  /* Get the value of Y minus its mean (given all mean params Gibbs).
+  * 
+  */ 
+  int N_long = Y_long.n_rows;
+  arma::mat mu = Lambda*eta; // D times N
+  arma::vec Y_min_mu_long(N_long);
+  for(int i=0; i<N_long; i++){ Y_min_mu_long(i) = Y_long(i) - mu( dind_long(i), IDs_long(i) ); }
+  return Y_min_mu_long;
 }
 
 // [[Rcpp::export]]

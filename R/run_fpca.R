@@ -47,10 +47,16 @@ run_fpca <- function(Y, K, dvec_unique=1:nrow(Y), post_process=T, Y_format='long
     IDs_y = as.character(Y[,1])
     dvec_unique = sort(unique(Y[,2]))
     D = length(dvec_unique) # Number of uniquely observed dose values.
+    # Set up and save long format Y for sampling noise variance term for Y
+    longY = TRUE
+    Y_long = matrix(Y[,3]) 
+    dind_long = matrix(sapply(Y[,2], function(x) which(dvec_unique==x) - 1)) # indexed for C++
+    IDs_long = rep(NA, nrow(Y))
     obs_Y = Y_new = matrix(NA, nrow=D, ncol=N)
     for(i in 1:length(IDs)){
       id = IDs[i]
       ind_tmp = which(IDs_y == id)
+      IDs_long[ind_tmp] = (id-1) # for C++ indexing
       doses_tmp = Y[ind_tmp,2]
       resps_tmp = Y[ind_tmp,3]
       for(d in 1:D){
@@ -163,7 +169,13 @@ run_fpca <- function(Y, K, dvec_unique=1:nrow(Y), post_process=T, Y_format='long
     # Error terms for Y
     Y_min_mu = get_Y_min_mu(Y, Lambda, eta)
     if(is.null(sigsq_Y_fixed)){
-      sigsq_y_vec = sample_sigsq_y(a_sig_y, b_sig_y, Y_min_mu, obs_Y, homo_Y)
+      if(longY){
+        Y_min_mu = get_Y_min_mu_long(Y_long, Lambda, eta, IDs_long, dind_long, D)
+        sigsq_y_vec = sample_sigsq_y_long(a_sig_y, b_sig_y, Y_min_mu, obs_Y, homo_Y)
+      } else{
+        Y_min_mu = get_Y_min_mu(Y, Lambda, eta)
+        sigsq_y_vec = sample_sigsq_y(a_sig_y, b_sig_y, Y_min_mu, obs_Y, homo_Y)
+      }
     } else{
       sigsq_y_vec = matrix(rep(norm_rescale^2 * sigsq_Y_fixed, D))
     }
