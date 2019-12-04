@@ -303,7 +303,7 @@ run_bs3fa <- function(X, Y, K, J, X_type=rep("continuous", nrow(X)), post_proces
     if(is.null(sigsq_Y_fixed)){
       if(longY){
         Y_min_mu = get_Y_min_mu_long(Y_long, Lambda, eta, IDs_long, dind_long)
-        sigsq_y_vec = sample_sigsq_y_long(a_sig_y, norm_rescale^2 * b_sig_y, Y_min_mu, obs_Y, homo_Y)
+        sigsq_y_vec = sample_sigsq_longy(a_sig_y, norm_rescale^2 * b_sig_y, Y_min_mu, obs_Y, homo_Y)
       } else{
         Y_min_mu = get_Y_min_mu(Y, Lambda, eta)
         sigsq_y_vec = sample_sigsq_y(a_sig_y, norm_rescale^2 * b_sig_y, Y_min_mu, obs_Y, homo_Y)
