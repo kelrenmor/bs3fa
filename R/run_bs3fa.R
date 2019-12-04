@@ -1,10 +1,13 @@
-run_bs3fa <- function(X, Y, K, J, X_type=rep("continuous", nrow(X)), dvec_unique=1:nrow(Y), post_process=T,
-                      nsamps_save=500, thin=10, burnin=5000, nugget=1e-8, l=nrow(Y)*0.0008, 
-                      update_ls=list("type"="auto", "niter_max"=500, "l_diff"=1/(10*nrow(Y)), 
+run_bs3fa <- function(X, Y, K, J, X_type=rep("continuous", nrow(X)), post_process=T,
+                      D=ifelse(ncol(X)==ncol(Y), nrow(Y), length(unique(Y[,2]))),
+                      dvec_unique=ifelse(ncol(X)==ncol(Y), 1:nrow(Y), sort(unique(Y[,2]))),
+                      nsamps_save=500, thin=10, burnin=5000, nugget=1e-8, l=D*0.0008, 
+                      update_ls=list("type"="auto", "niter_max"=500, "l_diff"=1/(10*D), 
                                      "reset_ls"=round(3*burnin/4), "l_new"=NULL),
                       fr_normalize=T, random_init=T, homo_Y=T, print_progress=T, scale_X=T,
                       a1_delta_xi=2.1, a1_delta_om=2.1, a2_delta_xi=3.1, a2_delta_om=3.1,
-                      a_sig_y=1, b_sig_y=1, a_sig_x=1, b_sig_x=1,
+                      a_sig_y=1, b_sig_y=1, a_sig_x=1, b_sig_x=1, 
+                      num_ls_opts=1, ls_opts='auto', # change these to sample length-scale!
                       bad_samp_tol=nsamps_save, debug=F, sigsq_Y_fixed=NULL,
                       return_original_scale=F){
   
@@ -26,13 +29,13 @@ run_bs3fa <- function(X, Y, K, J, X_type=rep("continuous", nrow(X)), dvec_unique
   #          Note that the total samples overall are burnin + thin*nsamps_save.
   # nugget - Add for numerical stability in inversion of CovDD.
   # l - GP length-scale; SUPER IMPORTANT parameter, set conservatively before initialization.
-  # update_ls - A list with entries type (gives type of updating, either "auto", "manual", or "none"),
+  # update_ls - A list with entries type (gives type of updating, either "auto", "manual", "sample", or "none"),
   #             niter_max (for auto type, max times to try new l to see if it works),
   #             l_diff (for auto type, difference by which to bump up in l at each step of tuner),
   #             l_new (for manual type, new l to switch to after some burn-in period),
   #             reset_ls (for manual/auto type, at what ss to reset length-scale param),
+  #             NOTE if update_ls=="sample" a grid of num_ls_opts length-scale values will be tried
   #             OR set type to "none" to keep the same l throughout burnin and sampling.
-  # 
   # random_init - Set to T to initialize with random numbers, F to initialize to SVD solution.
   # homo_Y - Set to T for homoscedastic variance, F for hetero.
   # print_progress - Set to T to print sample number every iteration.
@@ -140,19 +143,45 @@ run_bs3fa <- function(X, Y, K, J, X_type=rep("continuous", nrow(X)), dvec_unique
   list2env(init_list, environment()) # puts list elements in environment
   g_xi = g_psi = 1; 
   covDD = get_covDD(matrix(dvec_unique), l);
-  # Handle l updating
-  update_ls_bool = T
-  if( update_ls[["type"]]=="none" ){
-    update_ls_bool = F
-  } else if( update_ls[["type"]]=="auto" ){
-    l_diff = update_ls[["l_diff"]]
-    niter_max = update_ls[["niter_max"]]
-    reset_ls = update_ls[["reset_ls"]]
-  } else if( update_ls[["type"]]=="manual" ){
-    l_new = update_ls[["l_new"]]
-    reset_ls = update_ls[["reset_ls"]]
+  
+  # Set up framework to sample the length-scale, if user sets num_ls_opts > 1
+  if(num_ls_opts>1){
+    update_ls_bool = TRUE
+    er_to_l = function(er){sqrt(er/6)} # function to go from effective range to length scale l
+    # get_covDD() is parameterized as sig^2 exp(-0.5 ||d-d'||^2 / l^2)
+    # For sig^2 exp(-phi ||d-d'||^2), back of envelope is effective range is 3/phi
+    # phi = 0.5 l^(-2) ----> 3/phi = 6 l^2 (small ranges, i.e. smaller than range of data, cause issues)
+    # so l = (effective_range / 6) ^(0.5)
+    sample_ls = TRUE
+    er_min = 1/D + 1e-2 # corresponds to minimum effective range
+    er_max = 0.4 # corresponds roughly to eff range spanning all data
+    l_opts = seq(er_to_l(er_min), er_to_l(er_max), length.out=num_ls_opts)
+    l_new = median(l_opts)
+    # Pre-compute the covDD matrices, and the log determinants and inverses of each.
+    covDD_all = covDDinv_all = array(NA, dim=c(D,D,num_ls_opts))
+    logdetCovDD_all = rep(NA, num_ls_opts)
+    for(j in 1:num_ls_opts){
+      covDD_all[,,j] = get_covDD(matrix(dvec_unique), l_opts[j])
+      covDDinv_all[,,j] = solve(covDD_all[,,j])
+      logdetCovDD_all[j] = determinant(covDD_all[,,j], logarithm=TRUE)$modulus[1]
+    }
+    reset_ls = round(3*burnin/4)
   } else{
-    stop("update_ls[['type']] must be one of 'auto', 'manual', 'none'")
+    # Handle l updating
+    if( update_ls[["type"]]=="none" ){
+      update_ls_bool = FALSE
+    } else if( update_ls[["type"]]=="auto" ){
+      l_diff = update_ls[["l_diff"]]
+      niter_max = update_ls[["niter_max"]]
+      reset_ls = update_ls[["reset_ls"]]
+      update_ls_bool = TRUE
+    } else if( update_ls[["type"]]=="manual" ){
+      l_new = update_ls[["l_new"]]
+      reset_ls = update_ls[["reset_ls"]]
+      update_ls_bool = TRUE
+    } else{
+      stop("update_ls[['type']] must be one of 'auto', 'manual', 'none'")
+    }
   }
   
   # Make matrices to save the samples of Lambda, Theta, eta, nu, and xi
@@ -220,6 +249,13 @@ run_bs3fa <- function(X, Y, K, J, X_type=rep("continuous", nrow(X)), dvec_unique
       alpha_lam_tmp = 1/(psi_lam_min*get_tau(delta_ome))
     }
     
+    # Length-scale (if that's the user-specified choice)
+    if( (num_ls_opts>1) & (ss>reset_ls) ){ 
+      lind = sample_lind(Lambda, alpha_lam, covDDinv_all, logdetCovDD_all)
+      l = l_opts[lind]
+      covDD = covDD_all[,,lind]
+    }
+    
     ##### Sample latent variable Z corresponding to non-continuous X  #####
     
     Z_samp = sample_X(X_type, X, sigsq_x_vec, Theta, eta, xi, nu)
@@ -266,7 +302,7 @@ run_bs3fa <- function(X, Y, K, J, X_type=rep("continuous", nrow(X)), dvec_unique
     # Error terms for Y
     if(is.null(sigsq_Y_fixed)){
       if(longY){
-        Y_min_mu = get_Y_min_mu_long(Y_long, Lambda, eta, IDs_long, dind_long, D)
+        Y_min_mu = get_Y_min_mu_long(Y_long, Lambda, eta, IDs_long, dind_long)
         sigsq_y_vec = sample_sigsq_y_long(a_sig_y, norm_rescale^2 * b_sig_y, Y_min_mu, obs_Y, homo_Y)
       } else{
         Y_min_mu = get_Y_min_mu(Y, Lambda, eta)
