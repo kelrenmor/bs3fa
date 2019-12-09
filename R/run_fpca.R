@@ -149,7 +149,7 @@ run_fpca <- function(Y, K, dvec_unique=1:nrow(Y), post_process=T, Y_format='long
     ##### Update length-scale hyperparameter to be as 'smooth' as possible.
     if( init & update_ls_bool ){ 
       if( ss>reset_ls ){
-        if( update_ls[["type"]]=="auto" ){
+        if( (update_ls[["type"]]=="auto") & (!(num_ls_opts>1)) ){
           l = update_l(l, l_diff, dvec_unique, niter_max, Y, Lambda, eta, 
                        alpha_lam_tmp, sigsq_y_vec, obs_Y)
         } else{ l = l_new }

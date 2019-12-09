@@ -213,7 +213,7 @@ run_bs3fa <- function(X, Y, K, J, X_type=rep("continuous", nrow(X)), post_proces
     ##### Update length-scale hyperparameter to be as 'smooth' as possible.
     if( init & update_ls_bool ){ 
       if( ss>reset_ls ){
-        if( update_ls[["type"]]=="auto" ){
+        if( (update_ls[["type"]]=="auto") & (!(num_ls_opts>1)) ){
           l = update_l(l, l_diff, dvec_unique, niter_max, Y, Lambda, eta, 
                        alpha_lam_tmp, sigsq_y_vec, obs_Y)
         } else{ l = l_new }
@@ -312,14 +312,19 @@ run_bs3fa <- function(X, Y, K, J, X_type=rep("continuous", nrow(X)), post_proces
       sigsq_y_save[,ind] = sigsq_y_vec
       sigsq_x_save[,ind] = sigsq_x_vec
       Y_save[,,ind] = sample_Y_miss(Lambda, eta, sigsq_y_vec, Y, all_nobs_mat)
-      DRcurve_save[,,ind] = Lambda %*% eta / ifelse(return_original_scale,norm_rescale,1)
+      DRcurve_save[,,ind] = Lambda %*% eta
       X_save[not_cont,,ind] = Z[not_cont,] # only save sampled X vals
       if(num_ls_opts>1){l_save[ind] = l}
       tau_save[,ind] = tau_ome;
       ind = ind + 1
     }
-    
+
   }
+  
+  # Reset the Y-specific things back to their original scales!
+  Lambda_save = Lambda_save / ifelse(return_original_scale,norm_rescale,1)
+  sigsq_y_save = sigsq_y_save / ifelse(return_original_scale,norm_rescale^2,1)
+  Y_save = Y_save / ifelse(return_original_scale,norm_rescale,1)
   
   if( post_process & (K>1) ){
     
@@ -343,7 +348,7 @@ run_bs3fa <- function(X, Y, K, J, X_type=rep("continuous", nrow(X)), post_proces
     eta_save = abind(lapply(applier(lapply(eta_save, t), permsignList), t), along=3) 
     # Get out predicted mean for Lambda (on original scale if specified), eta, and Theta
     Theta_mean = apply(Theta_save,c(1,2),mean)
-    Lambda_mean = apply(Lambda_save,c(1,2),mean) / ifelse(return_original_scale,norm_rescale,1)
+    Lambda_mean = apply(Lambda_save,c(1,2),mean)
     eta_mean = apply(eta_save,c(1,2),mean)
     
     ### Correct ambiguity for X-specific components
@@ -372,11 +377,11 @@ run_bs3fa <- function(X, Y, K, J, X_type=rep("continuous", nrow(X)), post_proces
   }
   
   ##### Get out predicted mean and 95% credible interval for Y (on original scale if specified)
-  Y_mean = apply(DRcurve_save,c(1,2),mean)/ifelse(return_original_scale,norm_rescale,1) # Rao-blackwell
-  Y_ll = apply(Y_save,c(1,2),function(x) quantile(x, 0.025))/ifelse(return_original_scale,norm_rescale,1)
-  Y_ul = apply(Y_save,c(1,2),function(x) quantile(x, 0.975))/ifelse(return_original_scale,norm_rescale,1)
-  DR_ll = apply(DRcurve_save,c(1,2),function(x) quantile(x, 0.025))/ifelse(return_original_scale,norm_rescale,1)
-  DR_ul = apply(DRcurve_save,c(1,2),function(x) quantile(x, 0.975))/ifelse(return_original_scale,norm_rescale,1)
+  Y_mean = apply(DRcurve_save,c(1,2),mean)
+  Y_ll = apply(Y_save,c(1,2),function(x) quantile(x, 0.025))
+  Y_ul = apply(Y_save,c(1,2),function(x) quantile(x, 0.975))
+  DR_ll = apply(DRcurve_save,c(1,2),function(x) quantile(x, 0.025))
+  DR_ul = apply(DRcurve_save,c(1,2),function(x) quantile(x, 0.975))
   
   ##### Save everything in a list and return said list.
   res = list("Theta_save"=Theta_save, "Lambda_save"=Lambda_save, "eta_save"=eta_save, 
