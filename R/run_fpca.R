@@ -2,9 +2,9 @@ run_fpca <- function(Y, K, dvec_unique=1:nrow(Y), post_process=T, Y_format='long
                      nsamps_save=500, thin=10, burnin=5000, nugget=1e-8, l=nrow(Y)*0.0008, 
                      update_ls=list("type"="auto", "niter_max"=500, "l_diff"=1/(10*nrow(Y)), 
                                        "reset_ls"=round(3*burnin/4), "l_new"=NULL), 
-                     num_ls_opts=1, ls_opts='auto', # change these to sample length-scale!
-                     random_init=T, homo_Y=T, print_progress=T, a1_delta_om=2.1, a2_delta_om=3.1,
-                     a_sig_y=1, b_sig_y=1, bad_samp_tol=nsamps_save, debug=F, sigsq_Y_fixed=NULL){
+                     num_ls_opts=100, ls_opts='auto', # change these to sample length-scale!
+                     homo_Y=T, print_progress=T, 
+                     a_sig_y=1, b_sig_y=1){
   
   # Y - D x N dose response curve matrix, where S is the number of doses and N is the no of obs.
   #     (if Y provided in this format, and no explicit labels are included in Y, col alignment assumed)
@@ -18,7 +18,7 @@ run_fpca <- function(Y, K, dvec_unique=1:nrow(Y), post_process=T, Y_format='long
   # burnin - The number of initial samples to be thrown out.
   #          Note that the total samples overall are burnin + thin*nsamps_save.
   # nugget - Add for numerical stability in inversion of CovDD.
-  # l - GP length-scale; SUPER IMPORTANT parameter, set conservatively before initialization.
+  # l - GP length-scale; IMPORTANT parameter, set conservatively before initialization.
   # update_ls - A list with entries type (gives type of updating, either "auto", "manual", or "none"),
   #             niter_max (for auto type, max times to try new l to see if it works),
   #             l_diff (for auto type, difference by which to bump up in l at each step of tuner),
@@ -26,17 +26,17 @@ run_fpca <- function(Y, K, dvec_unique=1:nrow(Y), post_process=T, Y_format='long
   #             reset_ls (for manual/auto type, at what ss to reset length-scale param),
   #             OR set type to "none" to keep the same l throughout burnin and sampling.
   # 
-  # random_init - Set to T to initialize with random numbers, F to initialize to SVD solution.
   # homo_Y - Set to T for homoscedastic variance, F for hetero.
   # print_progress - Set to T to print sample number every iteration.
   # update_ls - Set to T to update length-scale hyperparam partway through sampling.
-  # a1_delta_om/a2_delta_om - Hyperparameters for B&D shrinkage prior.
-  # bad_samp_tol - Total number of bad_samps before killing sampler.
-  # debug - For internal debugging, will print when Lambda sample is bad.
-  # sigsq_Y_fixed - Default NULL, but to fix sigsq_Y_vec set to numeric value.
   
   # Load libraries and Cpp functions
   library(abind)
+  
+  # Set some default settings
+  random_init=T # Set to T to initialize with random numbers, F to initialize to SVD solution.
+  a1_delta_om=2.1; a2_delta_om=3.1 # Hyperparameters for B&D shrinkage prior.
+  bad_samp_tol=nsamps_save # Total number of bad_samps before killing sampler.
   
   ##### Do preliminary data manipulation and normalization
   if( Y_format=='wide' ){ # Then number of obs per chemical/dose combo is 1 (when observed).
@@ -164,12 +164,6 @@ run_fpca <- function(Y, K, dvec_unique=1:nrow(Y), post_process=T, Y_format='long
     Lam_samp = sample_Lambda_err(Y, Lambda, eta, alpha_lam, sigsq_y_vec, covDD, obs_Y)
     Lambda = Lam_samp$Lambda
     bad_samps = bad_samps + Lam_samp$bad
-    if( debug ){
-      print(ss)
-      if( Lam_samp$bad==1 ){
-        print("BAD LAMBDA SAMPLE!")
-      }
-    }
     if( bad_samps>bad_samp_tol){
       print(paste(sep="","Error: bad_samps=",bad_samps,"with l=",l,", try smaller l"))
       return(-1)
@@ -201,16 +195,12 @@ run_fpca <- function(Y, K, dvec_unique=1:nrow(Y), post_process=T, Y_format='long
     
     # Error terms for Y
     Y_min_mu = get_Y_min_mu(Y, Lambda, eta)
-    if(is.null(sigsq_Y_fixed)){
-      if(longY){
-        Y_min_mu = get_Y_min_mu_long(Y_long, Lambda, eta, IDs_long, dind_long)
-        sigsq_y_vec = sample_sigsq_longy(a_sig_y, b_sig_y, Y_min_mu, obs_Y, homo_Y, D)
-      } else{
-        Y_min_mu = get_Y_min_mu(Y, Lambda, eta)
-        sigsq_y_vec = sample_sigsq_y(a_sig_y, b_sig_y, Y_min_mu, obs_Y, homo_Y)
-      }
+    if(longY){
+      Y_min_mu = get_Y_min_mu_long(Y_long, Lambda, eta, IDs_long, dind_long)
+      sigsq_y_vec = sample_sigsq_longy(a_sig_y, b_sig_y, Y_min_mu, obs_Y, homo_Y, D)
     } else{
-      sigsq_y_vec = matrix(rep(norm_rescale^2 * sigsq_Y_fixed, D))
+      Y_min_mu = get_Y_min_mu(Y, Lambda, eta)
+      sigsq_y_vec = sample_sigsq_y(a_sig_y, b_sig_y, Y_min_mu, obs_Y, homo_Y)
     }
 
     ##### Save samples #####

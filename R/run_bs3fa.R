@@ -4,13 +4,10 @@ run_bs3fa <- function(X, Y, K, J, X_type=rep("continuous", nrow(X)), post_proces
                       nsamps_save=500, thin=10, burnin=5000, nugget=1e-8, l=D*0.0008, 
                       update_ls=list("type"="auto", "niter_max"=500, "l_diff"=1/(10*D), 
                                      "reset_ls"=round(3*burnin/4), "l_new"=NULL),
-                      fr_normalize=T, random_init=T, homo_Y=T, print_progress=T, scale_X=T,
-                      a1_delta_xi=2.1, a1_delta_om=2.1, a2_delta_xi=3.1, a2_delta_om=3.1,
+                      homo_Y=T, print_progress=T, scale_X=T,
                       a_sig_y=1, b_sig_y=1, a_sig_x=1, b_sig_x=1, 
-                      num_ls_opts=1, ls_opts='auto', # change these to sample length-scale!
-                      bad_samp_tol=nsamps_save, debug=F, sigsq_Y_fixed=NULL,
-                      return_original_scale=F){
-  
+                      num_ls_opts=50, ls_opts='auto') # change these to sample length-scale!
+{
   # X - S x N chemical feature matrix, where S is the number of features and N is the no of obs.
   #     If Y is provided in 'long' format colnames(X) must give IDs used for Y.
   # Y - D x N dose response curve matrix, where S is the number of doses and N is the no of obs.
@@ -28,7 +25,7 @@ run_bs3fa <- function(X, Y, K, J, X_type=rep("continuous", nrow(X)), post_proces
   # burnin - The number of initial samples to be thrown out.
   #          Note that the total samples overall are burnin + thin*nsamps_save.
   # nugget - Add for numerical stability in inversion of CovDD.
-  # l - GP length-scale; SUPER IMPORTANT parameter, set conservatively before initialization.
+  # l - GP length-scale; IMPORTANT parameter, set conservatively before initialization.
   # update_ls - A list with entries type (gives type of updating, either "auto", "manual", "sample", or "none"),
   #             niter_max (for auto type, max times to try new l to see if it works),
   #             l_diff (for auto type, difference by which to bump up in l at each step of tuner),
@@ -36,20 +33,22 @@ run_bs3fa <- function(X, Y, K, J, X_type=rep("continuous", nrow(X)), post_proces
   #             reset_ls (for manual/auto type, at what ss to reset length-scale param),
   #             NOTE if update_ls=="sample" a grid of num_ls_opts length-scale values will be tried
   #             OR set type to "none" to keep the same l throughout burnin and sampling.
-  # random_init - Set to T to initialize with random numbers, F to initialize to SVD solution.
+  # random_init - 
   # homo_Y - Set to T for homoscedastic variance, F for hetero.
   # print_progress - Set to T to print sample number every iteration.
-  # update_ls - Set to T to update length-scale hyperparam partway through sampling.
   # scale_X - Scale X (set variable means to 0 and SDs to 1).
   # a1_delta_xi/a1_delta_om - Hyperparameters for B&D shrinkage prior.
   # a2_delta_xi/a2_delta_om - Hyperparameters for B&D shrinkage prior.
-  # bad_samp_tol - Total number of bad_samps before killing sampler.
-  # debug - For internal debugging, will print when Lambda sample is bad.
-  # sigsq_Y_fixed - Default NULL, but to fix sigsq_Y_vec set to numeric value.
-  # return_original_scale - Whether to return values back in their original scale or internally rescaled form.
-  
+
   # Load libraries and Cpp functions
   library(abind)
+  
+  # Set some default settings
+  fr_normalize=T
+  random_init=T # Set to T to initialize with random numbers, F to initialize to SVD solution.
+  a1_delta_xi=2.1; a1_delta_om=2.1; a2_delta_xi=3.1; a2_delta_om=3.1 # Hyperparameters for B&D shrinkage prior.
+  bad_samp_tol=nsamps_save # Total number of bad_samps before killing sampler.
+  return_original_scale=T # Get things back to their original scale before returning output
   
   ##### Do some checks:
   types = unique(X_type)
@@ -154,7 +153,7 @@ run_bs3fa <- function(X, Y, K, J, X_type=rep("continuous", nrow(X)), post_proces
     # so l = (effective_range / 6) ^(0.5)
     sample_ls = TRUE
     er_min = 1/D + 1e-2 # corresponds to minimum effective range
-    er_max = 0.4 # corresponds roughly to eff range spanning all data
+    er_max = 1 - 1e-2 # corresponds roughly to eff range spanning all data
     l_opts = seq(er_to_l(er_min), er_to_l(er_max), length.out=num_ls_opts)
     l_new = median(l_opts)
     # Pre-compute the covDD matrices, and the log determinants and inverses of each.
@@ -194,6 +193,8 @@ run_bs3fa <- function(X, Y, K, J, X_type=rep("continuous", nrow(X)), post_proces
   sigsq_x_save = matrix(NA, nrow=S, ncol=nsamps_save)
   Y_save = DRcurve_save = array(NA, dim=c(D,N,nsamps_save))
   X_save = array(NA, dim=c(S,N,nsamps_save))
+  if(num_ls_opts>1){l_save = rep(NA, nsamps_save)}else{l_save=NULL}
+  tau_save = matrix(NA, nrow=K, ncol=nsamps_save)
   
   ##### Run sampler
   init=T # Whether or not intialization is needed (will be changed to F upon initialization in sampler)
@@ -227,12 +228,6 @@ run_bs3fa <- function(X, Y, K, J, X_type=rep("continuous", nrow(X)), post_proces
     Lam_samp = sample_Lambda_err(Y, Lambda, eta, alpha_lam, sigsq_y_vec, covDD, obs_Y)
     Lambda = Lam_samp$Lambda
     bad_samps = bad_samps + Lam_samp$bad
-    if( debug ){
-      print(ss)
-      if( Lam_samp$bad==1 ){
-        print("BAD LAMBDA SAMPLE!")
-      }
-    }
     if( bad_samps>bad_samp_tol){
       print(paste(sep="","Error: bad_samps=",bad_samps,"with l=",l,", try smaller l"))
       return(-1)
@@ -261,11 +256,6 @@ run_bs3fa <- function(X, Y, K, J, X_type=rep("continuous", nrow(X)), post_proces
     Z_samp = sample_X(X_type, X, sigsq_x_vec, Theta, eta, xi, nu)
     Z = Z_samp$Z
     inf_samps = inf_samps + 1*(sum(Z_samp$inf_samples)>1)
-    if( debug ){
-      if( 1*(sum(Z_samp$inf_samples)>1) ){
-        print("BAD Z SAMPLE!")
-      }
-    }
     if( inf_samps>bad_samp_tol){
       print(paste(sep="","Error: inf_samps=",inf_samps,", try increasing J"))
       return(-1)
@@ -300,17 +290,14 @@ run_bs3fa <- function(X, Y, K, J, X_type=rep("continuous", nrow(X)), post_proces
     ##### Sample error terms #####
 
     # Error terms for Y
-    if(is.null(sigsq_Y_fixed)){
-      if(longY){
-        Y_min_mu = get_Y_min_mu_long(Y_long, Lambda, eta, IDs_long, dind_long)
-        sigsq_y_vec = sample_sigsq_longy(a_sig_y, norm_rescale^2 * b_sig_y, Y_min_mu, obs_Y, homo_Y, D)
-      } else{
-        Y_min_mu = get_Y_min_mu(Y, Lambda, eta)
-        sigsq_y_vec = sample_sigsq_y(a_sig_y, norm_rescale^2 * b_sig_y, Y_min_mu, obs_Y, homo_Y)
-      }
+    if(longY){
+      Y_min_mu = get_Y_min_mu_long(Y_long, Lambda, eta, IDs_long, dind_long)
+      sigsq_y_vec = sample_sigsq_longy(a_sig_y, norm_rescale^2 * b_sig_y, Y_min_mu, obs_Y, homo_Y, D)
     } else{
-      sigsq_y_vec = matrix(rep(norm_rescale^2 * sigsq_Y_fixed, D))
+      Y_min_mu = get_Y_min_mu(Y, Lambda, eta)
+      sigsq_y_vec = sample_sigsq_y(a_sig_y, norm_rescale^2 * b_sig_y, Y_min_mu, obs_Y, homo_Y)
     }
+    
     # Error terms for X
     X_min_mu = get_X_min_mu(Z, Theta, eta, xi, nu)
     sigsq_x_vec = sample_sigsq_x(a_sig_x, b_sig_x, X_min_mu, X_type)
@@ -327,6 +314,8 @@ run_bs3fa <- function(X, Y, K, J, X_type=rep("continuous", nrow(X)), post_proces
       Y_save[,,ind] = sample_Y_miss(Lambda, eta, sigsq_y_vec, Y, all_nobs_mat)
       DRcurve_save[,,ind] = Lambda %*% eta / ifelse(return_original_scale,norm_rescale,1)
       X_save[not_cont,,ind] = Z[not_cont,] # only save sampled X vals
+      if(num_ls_opts>1){l_save[ind] = l}
+      tau_save[,ind] = tau_ome;
       ind = ind + 1
     }
     
@@ -391,15 +380,19 @@ run_bs3fa <- function(X, Y, K, J, X_type=rep("continuous", nrow(X)), post_proces
   
   ##### Save everything in a list and return said list.
   res = list("Theta_save"=Theta_save, "Lambda_save"=Lambda_save, "eta_save"=eta_save, 
-             "Xi_save" = xi_save, "nu_save" = nu_save, "sigsq_y_save"=sigsq_y_save, "sigsq_x_save"=sigsq_x_save,
-             "dvec_unique"=dvec_unique, "dvec_unique_original"=dvec_unique_original, 
-             "l"=l, "covDD"=covDD, "Y"=Y, "X"=X, "X_save"=X_save, "not_cont_X_vars"=not_cont,
-             "norm_rescale"=norm_rescale, "kept_X_vars_original"=cond, "return_original_scale"=return_original_scale,
-             "DRcurve_save"=DRcurve_save, "DR_ll"=DR_ll, "DR_ul"=DR_ul,
-             "Y_save"=Y_save, "Y_mean"=Y_mean, "Y_ll"=Y_ll, "Y_ul"=Y_ul, 
+             "Xi_save" = xi_save, "nu_save" = nu_save, 
+             "l_save" = l_save, "tau_save" = tau_save,
+             "sigsq_y_save"=sigsq_y_save, "sigsq_x_save"=sigsq_x_save,
+             "DRcurve_save"=DRcurve_save, "Y_save"=Y_save, "Z"=X_save, 
+             # (ABOVE) All saves for parameters
+             "DRcurve_mean"=Y_mean, "DR_ll"=DR_ll, "DR_ul"=DR_ul,
+             "Y_mean"=Y_mean, "Y_ll"=Y_ll, "Y_ul"=Y_ul, 
              "Lambda_mean"=Lambda_mean, "Theta_mean"=Theta_mean, "eta_mean"=eta_mean, 
              "Xi_mean"=Xi_mean, "nu_mean"=nu_mean,
-             "S"=S, "D"=D, "K"=K, "J"=J)
+             # (ABOVE) Summary stats for parameters
+             "dvec_unique"=dvec_unique_original, "l"=l, "covDD"=covDD, "Y"=Y, "X"=X, "not_cont_X_vars"=not_cont,
+             "kept_X_vars_original"=cond, "S"=S, "D"=D, "K"=K, "J"=J)
+             # (ABOVE) Input data (save to output for reference)
   return(res)
   
 }
