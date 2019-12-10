@@ -129,7 +129,7 @@ run_fpca <- function(Y, K, dvec_unique=1:nrow(Y), post_process=T, Y_format='long
   # Make matrices to save the samples of Lambda, Theta, and eta
   Lambda_save = array(NA, dim=c(D,K,nsamps_save))
   eta_save = array(NA, dim=c(K,N,nsamps_save))
-  sigsq_y_save = matrix(NA, nrow=D, ncol=nsamps_save)
+  if(homo_Y){ sigsq_y_save = rep(NA, nsamps_save) }else{ sigsq_y_save = matrix(NA, nrow=D, ncol=nsamps_save) }
   Y_save = array(NA, dim=c(D,N,nsamps_save))
 
   ##### Run sampler
@@ -207,7 +207,7 @@ run_fpca <- function(Y, K, dvec_unique=1:nrow(Y), post_process=T, Y_format='long
     if( ss>burnin & ss%%thin==0 ){
       Lambda_save[,,ind] = Lambda
       eta_save[,,ind] = eta
-      sigsq_y_save[,ind] = sigsq_y_vec
+      if(homo_Y){ sigsq_y_save[ind] = sigsq_y_vec[1] }else{ sigsq_y_save[,ind] = sigsq_y_vec }
       Y_save[,,ind] = sample_Y_miss(Lambda, eta, sigsq_y_vec, Y, obs_Y)
       ind = ind + 1
     }

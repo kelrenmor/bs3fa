@@ -6,7 +6,7 @@ run_bs3fa <- function(X, Y, K, J, X_type=rep("continuous", nrow(X)), post_proces
                                      "reset_ls"=round(3*burnin/4), "l_new"=NULL),
                       homo_Y=T, print_progress=T, scale_X=T,
                       a_sig_y=1, b_sig_y=1, a_sig_x=1, b_sig_x=1, 
-                      num_ls_opts=50, ls_opts='auto') # change these to sample length-scale!
+                      num_ls_opts=50, ls_opts='auto', save_original_data=F) # change these to sample length-scale!
 {
   # X - S x N chemical feature matrix, where S is the number of features and N is the no of obs.
   #     If Y is provided in 'long' format colnames(X) must give IDs used for Y.
@@ -189,7 +189,7 @@ run_bs3fa <- function(X, Y, K, J, X_type=rep("continuous", nrow(X)), post_proces
   eta_save = array(NA, dim=c(K,N,nsamps_save))
   xi_save = array(NA, dim=c(S,J,nsamps_save))
   nu_save = array(NA, dim=c(J,N,nsamps_save))
-  sigsq_y_save = matrix(NA, nrow=D, ncol=nsamps_save)
+  if(homo_Y){ sigsq_y_save = rep(NA, nsamps_save) }else{ sigsq_y_save = matrix(NA, nrow=D, ncol=nsamps_save) }
   sigsq_x_save = matrix(NA, nrow=S, ncol=nsamps_save)
   Y_save = DRcurve_save = array(NA, dim=c(D,N,nsamps_save))
   X_save = array(NA, dim=c(S,N,nsamps_save))
@@ -309,7 +309,7 @@ run_bs3fa <- function(X, Y, K, J, X_type=rep("continuous", nrow(X)), post_proces
       eta_save[,,ind] = eta
       xi_save[,,ind] = xi
       nu_save[,,ind] = nu
-      sigsq_y_save[,ind] = sigsq_y_vec
+      if(homo_Y){ sigsq_y_save[ind] = sigsq_y_vec[1] }else{ sigsq_y_save[,ind] = sigsq_y_vec }
       sigsq_x_save[,ind] = sigsq_x_vec
       Y_save[,,ind] = sample_Y_miss(Lambda, eta, sigsq_y_vec, Y, all_nobs_mat)
       DRcurve_save[,,ind] = Lambda %*% eta
@@ -383,6 +383,7 @@ run_bs3fa <- function(X, Y, K, J, X_type=rep("continuous", nrow(X)), post_proces
   DR_ll = apply(DRcurve_save,c(1,2),function(x) quantile(x, 0.025))
   DR_ul = apply(DRcurve_save,c(1,2),function(x) quantile(x, 0.975))
   
+  
   ##### Save everything in a list and return said list.
   res = list("Theta_save"=Theta_save, "Lambda_save"=Lambda_save, "eta_save"=eta_save, 
              "Xi_save" = xi_save, "nu_save" = nu_save, 
@@ -393,11 +394,14 @@ run_bs3fa <- function(X, Y, K, J, X_type=rep("continuous", nrow(X)), post_proces
              "DRcurve_mean"=Y_mean, "DR_ll"=DR_ll, "DR_ul"=DR_ul,
              "Y_mean"=Y_mean, "Y_ll"=Y_ll, "Y_ul"=Y_ul, 
              "Lambda_mean"=Lambda_mean, "Theta_mean"=Theta_mean, "eta_mean"=eta_mean, 
-             "Xi_mean"=Xi_mean, "nu_mean"=nu_mean,
+             "Xi_mean"=Xi_mean, "nu_mean"=nu_mean)
              # (ABOVE) Summary stats for parameters
-             "dvec_unique"=dvec_unique_original, "l"=l, "covDD"=covDD, "Y"=Y, "X"=X, "not_cont_X_vars"=not_cont,
-             "kept_X_vars_original"=cond, "S"=S, "D"=D, "K"=K, "J"=J)
-             # (ABOVE) Input data (save to output for reference)
+  if(save_original_data){ # Input data (save to output for reference)
+    res_dat = list("dvec_unique"=dvec_unique_original, "l"=l, "covDD"=covDD, 
+                   "Y"=Y, "X"=X, "not_cont_X_vars"=not_cont,
+                   "kept_X_vars_original"=cond, "S"=S, "D"=D, "K"=K, "J"=J)
+    res = c(res, res_dat)
+  }
   return(res)
   
 }

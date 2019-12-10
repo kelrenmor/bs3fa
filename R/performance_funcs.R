@@ -1,11 +1,20 @@
 ### Functions used when evaluating performance of each method ###
 
 # Get pairwise distances between observations.
-get_dists = function(eta, inds=1:ncol(eta)){
+get_dists = function(eta, inds=1:ncol(eta), Lambda=NULL){
   # eta should be K x N (i.e., obs are along columns)
-  # inds can either be the test inds or left blank for all indices
-  dists = as.matrix(dist(t(eta)))[inds,inds]
-  dists = c( dists[lower.tri(dists, diag=FALSE)] )
+  # inds can either be the test inds or left blank for all indices.
+  # If Lambda is provided, distance will be weighted by column
+  # norms of Lambda for each draw of eta / Lambda.
+  if(is.null(Lambda)){
+    dists = as.matrix(dist(t(eta)))[inds,inds]
+    dists = c( dists[lower.tri(dists, diag=FALSE)] )
+  } else{
+    wts = apply(Lambda, 2, function(x) sum(x^2))
+    wtdeta = sweep(t(eta), 2, wts, function(x,y) x * sqrt(y))
+    dists = as.matrix(dist(wtdeta))[inds,inds]
+    dists = c( dists[lower.tri(dists, diag=FALSE)] )
+  }
   return(dists)
 }
 
