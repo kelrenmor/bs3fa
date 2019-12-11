@@ -5,7 +5,7 @@ run_bs3fa <- function(X, Y, K, J, X_type=rep("continuous", nrow(X)), post_proces
                       update_ls=list("type"="auto", "niter_max"=500, "l_diff"=1/(10*D), 
                                      "reset_ls"=round(3*burnin/4), "l_new"=NULL),
                       homo_Y=T, print_progress=T, scale_X=T,
-                      a_sig_y=1, b_sig_y=1, a_sig_x=1, b_sig_x=1, 
+                      a_sig_y=NULL, b_sig_y=NULL, a_sig_x=1, b_sig_x=1, 
                       num_ls_opts=50, ls_opts='auto', save_original_data=F) # change these to sample length-scale!
 {
   # X - S x N chemical feature matrix, where S is the number of features and N is the no of obs.
@@ -137,6 +137,8 @@ run_bs3fa <- function(X, Y, K, J, X_type=rep("continuous", nrow(X)), post_proces
   norm_rescale=norm_X/norm_Y
   Y = norm_rescale*Y # scale Y so relative weight is the same as that of X
   Y_long = norm_rescale*Y_long
+  a_y = ifelse( is.null(a_sig_y), 1, a_sig_y)
+  b_y = ifelse( is.null(b_sig_y), 1, norm_rescale^2 * b_sig_y)
   
   # Initialize parameters and define hyperparameter values
   init_list = sampler_init(random_init, N, D, S, K, J, X_type, X)
@@ -293,10 +295,10 @@ run_bs3fa <- function(X, Y, K, J, X_type=rep("continuous", nrow(X)), post_proces
     # Error terms for Y
     if(longY){
       Y_min_mu = get_Y_min_mu_long(Y_long, Lambda, eta, IDs_long, dind_long)
-      sigsq_y_vec = sample_sigsq_longy(a_sig_y, norm_rescale^2 * b_sig_y, Y_min_mu, dind_long, homo_Y, D)
+      sigsq_y_vec = sample_sigsq_longy(a_y, b_y, Y_min_mu, dind_long, homo_Y, D)
     } else{
       Y_min_mu = get_Y_min_mu(Y, Lambda, eta)
-      sigsq_y_vec = sample_sigsq_y(a_sig_y, norm_rescale^2 * b_sig_y, Y_min_mu, obs_Y, homo_Y)
+      sigsq_y_vec = sample_sigsq_y(a_y, b_y, Y_min_mu, obs_Y, homo_Y)
     }
     
     # Error terms for X
