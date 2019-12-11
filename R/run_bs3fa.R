@@ -136,6 +136,7 @@ run_bs3fa <- function(X, Y, K, J, X_type=rep("continuous", nrow(X)), post_proces
   }
   norm_rescale=norm_X/norm_Y
   Y = norm_rescale*Y # scale Y so relative weight is the same as that of X
+  Y_long = norm_rescale*Y_long
   
   # Initialize parameters and define hyperparameter values
   init_list = sampler_init(random_init, N, D, S, K, J, X_type, X)
@@ -292,7 +293,7 @@ run_bs3fa <- function(X, Y, K, J, X_type=rep("continuous", nrow(X)), post_proces
     # Error terms for Y
     if(longY){
       Y_min_mu = get_Y_min_mu_long(Y_long, Lambda, eta, IDs_long, dind_long)
-      sigsq_y_vec = sample_sigsq_longy(a_sig_y, norm_rescale^2 * b_sig_y, Y_min_mu, obs_Y, homo_Y, D)
+      sigsq_y_vec = sample_sigsq_longy(a_sig_y, norm_rescale^2 * b_sig_y, Y_min_mu, dind_long, homo_Y, D)
     } else{
       Y_min_mu = get_Y_min_mu(Y, Lambda, eta)
       sigsq_y_vec = sample_sigsq_y(a_sig_y, norm_rescale^2 * b_sig_y, Y_min_mu, obs_Y, homo_Y)
@@ -325,6 +326,7 @@ run_bs3fa <- function(X, Y, K, J, X_type=rep("continuous", nrow(X)), post_proces
   Lambda_save = Lambda_save / ifelse(return_original_scale,norm_rescale,1)
   sigsq_y_save = sigsq_y_save / ifelse(return_original_scale,norm_rescale^2,1)
   Y_save = Y_save / ifelse(return_original_scale,norm_rescale,1)
+  DRcurve_save = DRcurve_save / ifelse(return_original_scale,norm_rescale,1)
   
   if( post_process & (K>1) ){
     
