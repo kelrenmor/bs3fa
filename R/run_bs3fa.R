@@ -198,6 +198,7 @@ run_bs3fa <- function(X, Y, K, J, X_type=rep("continuous", nrow(X)), post_proces
   X_save = array(NA, dim=c(S,N,nsamps_save))
   if(num_ls_opts>1){l_save = rep(NA, nsamps_save)}else{l_save=NULL}
   tau_save = matrix(NA, nrow=K, ncol=nsamps_save)
+  tauxi_save = matrix(NA, nrow=J, ncol=nsamps_save)
   
   ##### Run sampler
   init=T # Whether or not intialization is needed (will be changed to F upon initialization in sampler)
@@ -319,6 +320,7 @@ run_bs3fa <- function(X, Y, K, J, X_type=rep("continuous", nrow(X)), post_proces
       X_save[not_cont,,ind] = Z[not_cont,] # only save sampled X vals
       if(num_ls_opts>1){l_save[ind] = l}
       tau_save[,ind] = tau_ome;
+      tauxi_save[,ind] = tau_xi;
       ind = ind + 1
     }
 
@@ -391,7 +393,7 @@ run_bs3fa <- function(X, Y, K, J, X_type=rep("continuous", nrow(X)), post_proces
   ##### Save everything in a list and return said list.
   res = list("Theta_save"=Theta_save, "Lambda_save"=Lambda_save, "eta_save"=eta_save, 
              "Xi_save" = xi_save, "nu_save" = nu_save, 
-             "l_save" = l_save, "tau_save" = tau_save,
+             "l_save" = l_save, "tau_save" = tau_save, "tauxi_save" = tauxi_save,
              "sigsq_y_save"=sigsq_y_save, "sigsq_x_save"=sigsq_x_save,
              "DRcurve_save"=DRcurve_save, "Y_save"=Y_save, "Z"=X_save, 
              # (ABOVE) All saves for parameters
