@@ -107,23 +107,18 @@ thin=10     # keep every 10th sample
 burnin=5000 # run sampler for 5000 draws before beginning to save
 nsamps_save=500 # save 500 samples in total
 post_process=T # resolve label/sign switches, rotational ambiguity
-random_init=F  # intial guess based on SVD rather than random init
 
 ## Run Gibbs sampler
 res=bs3fa::run_bs3fa(X=dat$X, Y=dat$Y, K=K_p, J=J_p, 
                      thin=thin, nsamps_save=nsamps_save, 
-                     burnin=burnin, post_process=post_process, 
-                     random_init=random_init, scale_X=F,
-                     print_progress=F,
-                     update_ls=list("type"="manual", 
-                                    "reset_ls"=round(3*burnin/4), 
-                                    "l_new"=0.111))
+                     burnin=burnin, post_process=post_process,
+                     print_progress=T)
 
 # --- SLIDE 16 --- #
 
 ## Plot model performance ($\Lambda$) pre-cleaning
 ## Note how the columns aren't necessarily matched up to truth, and the signs don't match
-p1 = bs3fa::plot_matrix(dat$Lambda_true*res$norm_rescale, type="Lambda", tit="Truth", include_legend=F)
+p1 = bs3fa::plot_matrix(dat$Lambda_true, type="Lambda", tit="Truth", include_legend=F)
 Lam_tmp = matrix(NA,nrow=nrow(dat$Lambda_true),ncol=K_p)
 for(k_mod in 1:K_p){Lam_tmp[,k_mod] = apply(res$Lambda_save[,k_mod,],1,mean)}
 p2 <- bs3fa::plot_matrix(Lam_tmp, type="Lambda", tit="Estimate", include_legend=F)
@@ -154,7 +149,7 @@ gridExtra::grid.arrange(p1, p2, nrow = 1)
 
 ## Plot model performance ($\Lambda$) post-cleaning
 # Compare truth and model mean side-by-side
-p1 <- bs3fa::plot_matrix(dat$Lambda_true*res$norm_rescale, type="Lambda", tit="Truth", include_legend=F)
+p1 <- bs3fa::plot_matrix(dat$Lambda_true, type="Lambda", tit="Truth", include_legend=F)
 p2 <- bs3fa::plot_matrix(res_clean$Lambda, type="Lambda", tit="Estimate", include_legend=F)
 gridExtra::grid.arrange(p1, p2, nrow = 1, widths = c(3/9,6/9))
 # Plot lower and upper end of 95% credible interval side-by-side
@@ -164,7 +159,7 @@ gridExtra::grid.arrange(p1, p2, nrow = 1)
 # Plot truth and 95% credible interval by dose for indices 1:3
 bs3fa::plot_Lambda_mod_tru(Lambda_low=res_clean$Lambda_low, Lambda=res_clean$Lambda,
 Lambda_upp=res_clean$Lambda_upp,
-Lambda_true=dat$Lambda_true*res$norm_rescale,
+Lambda_true=dat$Lambda_true,
 doses=dat$doses, inds=1:3)
 
 # --- SLIDE 24 --- #
@@ -191,7 +186,7 @@ theme_minimal() + theme_bw()
 ## Plot model performance (prediction)
 # Turn Lambda and eta samples into Lambda * eta 
 # (i.e., the predicted dose response curve)
-res_pred = pred_drcurve(Lambda_mod=res$Lambda_save, eta_mod=res$eta_save, rescale=res$norm_rescale)
+res_pred = pred_drcurve(Lambda_mod=res$Lambda_save, eta_mod=res$eta_save, rescale=1)
 # Display three random example unobserved curves
 ind_samp = sample(1:length(not_obs),2) # Pick two random unobserved curves
 
@@ -223,7 +218,7 @@ plot(dat$doses, piece_1 + piece_2 + piece_3 + dat$avg_dose_resp,
 
 ## Get the true and estimated std deviation of Y and X
 # For Y
-mod_sd_y = sqrt(res$sigsq_y_save/res$norm_rescale^2)
+mod_sd_y = sqrt(res$sigsq_y_save)
 hist(mod_sd_y)
 abline(v=mean(mod_sd_y), col="blue") # model estimate
 abline(v=std_error_y, col="red") # truth 

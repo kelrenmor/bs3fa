@@ -148,17 +148,12 @@ thin=10     # keep every 10th sample
 burnin=5000 # run sampler for 5000 draws before beginning to save
 nsamps_save=500 # save 500 samples in total
 post_process=T # resolve label/sign switches, rotational ambiguity
-random_init=F  # intial guess based on SVD rather than random init
 
 # Run sampler
 res=bs3fa::run_bs3fa(X=dat$X, Y=dat$Y, K=K_p, J=J_p, 
                      thin=thin, nsamps_save=nsamps_save, 
                      burnin=burnin, post_process=post_process, 
-                     random_init=random_init, scale_X=F,
-                     print_progress=F,
-                     update_ls=list("type"="manual", 
-                                    "reset_ls"=round(3*burnin/4), 
-                                    "l_new"=0.111))
+                     print_progress=T)
 
 ```
 
@@ -253,7 +248,7 @@ $$
 #gridExtra::grid.arrange(p1, p2, nrow = 1, widths = c(3/9,6/9))
 
 # Model performance ($\Lambda$)
- p1 <- bs3fa::plot_matrix(dat$Lambda_true*res$norm_rescale, type="Lambda", tit="Truth", include_legend=F)
+ p1 <- bs3fa::plot_matrix(dat$Lambda_true, type="Lambda", tit="Truth", include_legend=F)
  Lam_tmp = matrix(NA,nrow=nrow(dat$Lambda_true),ncol=K_p)
  for(k_mod in 1:K_p){
    # Get mean
@@ -308,7 +303,7 @@ The interval estimates we recover for these parameters are very tight, and usual
 ## Model performance ($\Lambda$)
 
 ```{r model-display-lam-1, fig.align='center', fig.height=2.75, fig.width=4.5, echo=F, warning=F}
-p1 <- bs3fa::plot_matrix(dat$Lambda_true*res$norm_rescale, type="Lambda", tit="Truth", include_legend=F)
+p1 <- bs3fa::plot_matrix(dat$Lambda_true, type="Lambda", tit="Truth", include_legend=F)
 p2 <- bs3fa::plot_matrix(res_clean$Lambda, type="Lambda", tit="Estimate", include_legend=F)
 gridExtra::grid.arrange(p1, p2, nrow = 1, widths = c(3/9,6/9))
 ```
@@ -328,7 +323,7 @@ The interval estimates for $\Lambda$ are similarly exact.
 ```{r model-display-lam-2, fig.align='center', fig.height=2.75, fig.width=4.5, echo=F, warning=F}
 bs3fa::plot_Lambda_mod_tru(Lambda_low=res_clean$Lambda_low, Lambda=res_clean$Lambda,
             Lambda_upp=res_clean$Lambda_upp,
-            Lambda_true=dat$Lambda_true*res$norm_rescale,
+            Lambda_true=dat$Lambda_true,
             doses=dat$doses, inds=1:3)
 ```
 Here are the smooth curves corresponding to this $\Lambda$ estimate.
@@ -383,7 +378,7 @@ We also show high predictive power for the simulated chemical distances
 # (i.e., the predicted dose response curve)
 res_pred = pred_drcurve(Lambda_mod=res$Lambda_save, 
                         eta_mod=res$eta_save, 
-                        rescale=res$norm_rescale)
+                        rescale=1)
 ```
 
 ```{r model-display-pred, fig.align='center', fig.height=2.25, fig.width=4.5, echo=F, warning=F}

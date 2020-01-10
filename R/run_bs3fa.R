@@ -1,6 +1,6 @@
 run_bs3fa <- function(X, Y, K, J, X_type=rep("continuous", nrow(X)), post_process=T,
                       D=ifelse(ncol(X)==ncol(Y), nrow(Y), length(unique(Y[,2]))),
-                      dvec_unique=ifelse(ncol(X)==ncol(Y), 1:nrow(Y), sort(unique(Y[,2]))),
+                      dvec_unique= if(ncol(X)==ncol(Y)) 1:nrow(Y) else sort(unique(Y[,2])),
                       nsamps_save=500, thin=10, burnin=5000, nugget=1e-8, l=D*0.0008, 
                       update_ls=list("type"="auto", "niter_max"=500, "l_diff"=1/(10*D), 
                                      "reset_ls"=round(3*burnin/4), "l_new"=NULL),
@@ -136,7 +136,7 @@ run_bs3fa <- function(X, Y, K, J, X_type=rep("continuous", nrow(X)), post_proces
   }
   norm_rescale=norm_X/norm_Y
   Y = norm_rescale*Y # scale Y so relative weight is the same as that of X
-  Y_long = norm_rescale*Y_long
+  if(longY){Y_long = norm_rescale*Y_long}
   a_y = ifelse( is.null(a_sig_y), 1, a_sig_y)
   b_y = ifelse( is.null(b_sig_y), 1, norm_rescale^2 * b_sig_y)
   
