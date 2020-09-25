@@ -1,10 +1,5 @@
 run_fpca <- function(Y, K, dvec_unique=1:nrow(Y), post_process=T, Y_format='long',
-                     nsamps_save=500, thin=10, burnin=5000, nugget=1e-8, l=nrow(Y)*0.0008, 
-                     update_ls=list("type"="auto", "niter_max"=500, "l_diff"=1/(10*nrow(Y)), 
-                                       "reset_ls"=round(3*burnin/4), "l_new"=NULL), 
-                     num_ls_opts=100, ls_opts='auto', # change these to sample length-scale!
-                     homo_Y=T, print_progress=T, 
-                     a_sig_y=1, b_sig_y=1){
+                     nsamps_save=500, thin=10, burnin=5000, print_progress=T){
   
   # Y - D x N dose response curve matrix, where S is the number of doses and N is the no of obs.
   #     (if Y provided in this format, and no explicit labels are included in Y, col alignment assumed)
@@ -17,18 +12,8 @@ run_fpca <- function(Y, K, dvec_unique=1:nrow(Y), post_process=T, Y_format='long
   # thin - Every thin-th sample will be kept, the rest discarded.
   # burnin - The number of initial samples to be thrown out.
   #          Note that the total samples overall are burnin + thin*nsamps_save.
-  # nugget - Add for numerical stability in inversion of CovDD.
-  # l - GP length-scale; IMPORTANT parameter, set conservatively before initialization.
-  # update_ls - A list with entries type (gives type of updating, either "auto", "manual", or "none"),
-  #             niter_max (for auto type, max times to try new l to see if it works),
-  #             l_diff (for auto type, difference by which to bump up in l at each step of tuner),
-  #             l_new (for manual type, new l to switch to after some burn-in period),
-  #             reset_ls (for manual/auto type, at what ss to reset length-scale param),
-  #             OR set type to "none" to keep the same l throughout burnin and sampling.
-  # 
   # homo_Y - Set to T for homoscedastic variance, F for hetero.
   # print_progress - Set to T to print sample number every iteration.
-  # update_ls - Set to T to update length-scale hyperparam partway through sampling.
   
   # Load libraries and Cpp functions
   library(abind)
@@ -37,6 +22,10 @@ run_fpca <- function(Y, K, dvec_unique=1:nrow(Y), post_process=T, Y_format='long
   random_init=T # Set to T to initialize with random numbers, F to initialize to SVD solution.
   a1_delta_om=2.1; a2_delta_om=3.1 # Hyperparameters for B&D shrinkage prior.
   bad_samp_tol=nsamps_save # Total number of bad_samps before killing sampler.
+  num_ls_opts=100 # Number of length-scale options to grid over
+  nugget=1e-8 # Add for numerical stability in inversion of CovDD.
+  homo_Y=T # Set to T for homoscedastic variance (only option for now), F for hetero.
+  a_sig_y=1; b_sig_y=1
   
   ##### Do preliminary data manipulation and normalization
   if( Y_format=='wide' ){ # Then number of obs per chemical/dose combo is 1 (when observed).
@@ -90,7 +79,6 @@ run_fpca <- function(Y, K, dvec_unique=1:nrow(Y), post_process=T, Y_format='long
   # Handle l updating
   # Set up framework to sample the length-scale, if user sets num_ls_opts > 1
   if(num_ls_opts>1){
-    update_ls_bool = TRUE
     er_to_l = function(er){sqrt(er/6)} # function to go from effective range to length scale l
     # get_covDD() is parameterized as sig^2 exp(-0.5 ||d-d'||^2 / l^2)
     # For sig^2 exp(-phi ||d-d'||^2), back of envelope is effective range is 3/phi
@@ -110,21 +98,6 @@ run_fpca <- function(Y, K, dvec_unique=1:nrow(Y), post_process=T, Y_format='long
       logdetCovDD_all[j] = determinant(covDD_all[,,j], logarithm=TRUE)$modulus[1]
     }
     reset_ls = round(3*burnin/4)
-  } else{
-    if( update_ls[["type"]]=="none" ){
-      update_ls_bool = F
-    } else if( update_ls[["type"]]=="auto" ){
-      l_diff = update_ls[["l_diff"]]
-      niter_max = update_ls[["niter_max"]]
-      reset_ls = update_ls[["reset_ls"]]
-      update_ls_bool = T
-    } else if( update_ls[["type"]]=="manual" ){
-      l_new = update_ls[["l_new"]]
-      reset_ls = update_ls[["reset_ls"]]
-      update_ls_bool = T
-    } else{
-      stop("update_ls[['type']] must be one of 'auto', 'manual', 'none'")
-    }
   }
   
   # Make matrices to save the samples of Lambda, Theta, and eta
@@ -145,18 +118,6 @@ run_fpca <- function(Y, K, dvec_unique=1:nrow(Y), post_process=T, Y_format='long
     if( print_progress & ss%in%update_samps ){
       print(paste(sep="",round(100*ss/nsamps),"% done sampling"))
       print(paste(sep="",bad_samps," bad samples"))
-    }
-    
-    ##### Update length-scale hyperparameter to be as 'smooth' as possible.
-    if( init & update_ls_bool ){ 
-      if( ss>reset_ls ){
-        if( (update_ls[["type"]]=="auto") & (!(num_ls_opts>1)) ){
-          l = update_l(l, l_diff, dvec_unique, niter_max, Y, Lambda, eta, 
-                       alpha_lam_tmp, sigsq_y_vec, obs_Y)
-        } else{ l = l_new }
-        covDD = get_covDD(matrix(dvec_unique), l)
-        init = F
-      }
     }
     
     ##### Sample Y-specific factor loading matrix \Lambda and shrinkage params  #####

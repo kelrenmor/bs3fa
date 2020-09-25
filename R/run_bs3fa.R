@@ -1,12 +1,7 @@
 run_bs3fa <- function(X, Y, K, J, X_type=rep("continuous", nrow(X)), post_process=T,
-                      D=ifelse(ncol(X)==ncol(Y), nrow(Y), length(unique(Y[,2]))),
                       dvec_unique= if(ncol(X)==ncol(Y)) 1:nrow(Y) else sort(unique(Y[,2])),
-                      nsamps_save=500, thin=10, burnin=5000, nugget=1e-8, l=D*0.0008, 
-                      update_ls=list("type"="auto", "niter_max"=500, "l_diff"=1/(10*D), 
-                                     "reset_ls"=round(3*burnin/4), "l_new"=NULL),
-                      homo_Y=T, print_progress=T, scale_X=T,
-                      a_sig_y=NULL, b_sig_y=NULL, a_sig_x=1, b_sig_x=1, 
-                      num_ls_opts=50, ls_opts='auto', save_original_data=F) # change these to sample length-scale!
+                      nsamps_save=500, thin=10, burnin=5000, 
+                      print_progress=T, save_original_data=F)
 {
   # X - S x N chemical feature matrix, where S is the number of features and N is the no of obs.
   #     If Y is provided in 'long' format colnames(X) must give IDs used for Y.
@@ -24,21 +19,8 @@ run_bs3fa <- function(X, Y, K, J, X_type=rep("continuous", nrow(X)), post_proces
   # thin - Every thin-th sample will be kept, the rest discarded.
   # burnin - The number of initial samples to be thrown out.
   #          Note that the total samples overall are burnin + thin*nsamps_save.
-  # nugget - Add for numerical stability in inversion of CovDD.
-  # l - GP length-scale; IMPORTANT parameter, set conservatively before initialization.
-  # update_ls - A list with entries type (gives type of updating, either "auto", "manual", "sample", or "none"),
-  #             niter_max (for auto type, max times to try new l to see if it works),
-  #             l_diff (for auto type, difference by which to bump up in l at each step of tuner),
-  #             l_new (for manual type, new l to switch to after some burn-in period),
-  #             reset_ls (for manual/auto type, at what ss to reset length-scale param),
-  #             NOTE if update_ls=="sample" a grid of num_ls_opts length-scale values will be tried
-  #             OR set type to "none" to keep the same l throughout burnin and sampling.
-  # random_init - 
-  # homo_Y - Set to T for homoscedastic variance, F for hetero.
   # print_progress - Set to T to print sample number every iteration.
-  # scale_X - Scale X (set variable means to 0 and SDs to 1).
-  # a1_delta_xi/a1_delta_om - Hyperparameters for B&D shrinkage prior.
-  # a2_delta_xi/a2_delta_om - Hyperparameters for B&D shrinkage prior.
+  # save_original_data - Set to T to save the data along with inference stuff.
 
   # Load libraries and Cpp functions
   library(abind)
@@ -49,6 +31,12 @@ run_bs3fa <- function(X, Y, K, J, X_type=rep("continuous", nrow(X)), post_proces
   a1_delta_xi=2.1; a1_delta_om=2.1; a2_delta_xi=3.1; a2_delta_om=3.1 # Hyperparameters for B&D shrinkage prior.
   bad_samp_tol=nsamps_save # Total number of bad_samps before killing sampler.
   return_original_scale=T # Get things back to their original scale before returning output
+  nugget=1e-8 # Add for numerical stability in inversion of CovDD.
+  homo_Y=T # Set to T for homoscedastic variance (only option for now), F for hetero.
+  scale_X=T # Scale X (set variable means to 0 and SDs to 1).
+  D=ifelse(ncol(X)==ncol(Y), nrow(Y), length(unique(Y[,2])))
+  a_sig_y=NULL; b_sig_y=NULL; a_sig_x=1; b_sig_x=1 
+  num_ls_opts=50 # Number of length-scale options to grid over
   
   ##### Do some checks:
   types = unique(X_type)
@@ -169,21 +157,7 @@ run_bs3fa <- function(X, Y, K, J, X_type=rep("continuous", nrow(X)), post_proces
     }
     reset_ls = round(3*burnin/4)
   } else{
-    # Handle l updating
-    if( update_ls[["type"]]=="none" ){
-      update_ls_bool = FALSE
-    } else if( update_ls[["type"]]=="auto" ){
-      l_diff = update_ls[["l_diff"]]
-      niter_max = update_ls[["niter_max"]]
-      reset_ls = update_ls[["reset_ls"]]
-      update_ls_bool = TRUE
-    } else if( update_ls[["type"]]=="manual" ){
-      l_new = update_ls[["l_new"]]
-      reset_ls = update_ls[["reset_ls"]]
-      update_ls_bool = TRUE
-    } else{
-      stop("update_ls[['type']] must be one of 'auto', 'manual', 'none'")
-    }
+    update_ls_bool = FALSE
   }
   
   # Make matrices to save the samples of Lambda, Theta, eta, nu, and xi
@@ -203,7 +177,6 @@ run_bs3fa <- function(X, Y, K, J, X_type=rep("continuous", nrow(X)), post_proces
   tauxi_save = matrix(NA, nrow=J, ncol=nsamps_save)
   
   ##### Run sampler
-  init=T # Whether or not intialization is needed (will be changed to F upon initialization in sampler)
   ind=1 # Starting index for saving values.
   bad_samps=0 # Number of samples for which cov matrix is not symmetric PD
   inf_samps=0 # Number of samples for which the non-continuous X samps come up inf
@@ -234,19 +207,6 @@ run_bs3fa <- function(X, Y, K, J, X_type=rep("continuous", nrow(X)), post_proces
     Zmean = sample_meanZ(Z, Theta, eta, xi, nu, sigsq_x_vec, tau_Zmn)
     # Precision term for the mean of Z
     tau_Zmn = sample_tau_Zmn(Zmean)
-    
-    ##### Update length-scale hyperparameter to be as 'smooth' as possible if you don't sample it.
-    
-    if( init & update_ls_bool ){ 
-      if( ss>reset_ls ){
-        if( (update_ls[["type"]]=="auto") & (!(num_ls_opts>1)) ){
-          l = update_l(l, l_diff, dvec_unique, niter_max, Ycentered, Lambda, eta, 
-                       alpha_lam_tmp, sigsq_y_vec, obs_Y)
-        } else{ l = l_new }
-        covDD = get_covDD(matrix(dvec_unique), l)
-        init = F
-      }
-    }
     
     ##### Sample Y-specific factor loading matrix \Lambda and shrinkage params  #####
     
