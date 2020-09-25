@@ -654,7 +654,7 @@ arma::vec sample_meanZ(arma::mat ZplusMean, arma::mat Theta, arma::mat eta,
   
   // Only count elements that are observed 
   for( int s=0; s<S; s++ ){
-    Ztmp = Zst.row(s);
+    Ztmp = Zst.row(s).t();
     tau_s = tau_Zmn(s);
     sigsq_s = sigsq_z(s);
     post_sigsq = 1.0 / ( 1.0/tau_s + N/sigsq_s );

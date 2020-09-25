@@ -155,7 +155,7 @@ run_bs3fa <- function(X, Y, K, J, X_type=rep("continuous", nrow(X)), post_proces
       covDDinv_all[,,j] = solve(covDD_all[,,j])
       logdetCovDD_all[j] = determinant(covDD_all[,,j], logarithm=TRUE)$modulus[1]
     }
-    reset_ls = round(3*burnin/4)
+    reset_ls = round(1*burnin/2)
   } else{
     update_ls_bool = FALSE
   }
@@ -186,7 +186,7 @@ run_bs3fa <- function(X, Y, K, J, X_type=rep("continuous", nrow(X)), post_proces
   for(ss in 1:nsamps){
     if( print_progress & ss%in%update_samps ){
       print(paste(sep="",round(100*ss/nsamps),"% done sampling"))
-      print(paste(sep="",bad_samps," bad samples"))
+      if(bad_samps>0){ print(paste(sep="",bad_samps," bad samples")) }
     }
     
     ##### Sample mean of Y, Y-specific factor loading matrix \Lambda and shrinkage params  #####
@@ -297,7 +297,7 @@ run_bs3fa <- function(X, Y, K, J, X_type=rep("continuous", nrow(X)), post_proces
       if(homo_Y){ sigsq_y_save[ind] = sigsq_y_vec[1] }else{ sigsq_y_save[,ind] = sigsq_y_vec }
       sigsq_x_save[,ind] = sigsq_x_vec
       Ymean_save[,ind] = Ymean
-      Xmean_save[,ind] = Xmean
+      Xmean_save[,ind] = Zmean
       Y_save[,,ind] = sample_Y_miss(Lambda, eta, sigsq_y_vec, Y, all_nobs_mat, Ymean)
       DRcurve_save[,,ind] = Lambda %*% eta
       X_save[not_cont,,ind] = Z[not_cont,] # only save sampled X vals
