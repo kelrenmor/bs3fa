@@ -32,6 +32,7 @@ sampler_init <- function(random_init, N, D, S, K, J, X_type, X){
     delta_ome = matrix(1, nrow=K, ncol=1)
     # Latent variable Z for non-continuous X
     Z = sample_X_init(X_type, X, sigsq_x_vec)
+    Zmean = matrix( apply(Z, 1, mean) )
     # Hyperparameters for Ymean and Zmean
     alpha_Ymn = 1
     tau_Zmn = matrix(1, nrow=S)
@@ -68,6 +69,7 @@ sampler_init <- function(random_init, N, D, S, K, J, X_type, X){
     tau_ome = matrix(1, nrow=K, ncol=1)
     delta_ome = matrix(1, nrow=K, ncol=1)
     Z = sample_X_init(X_type, X, sigsq_x_vec)
+    Zmean = matrix( apply(Z, 1, mean) )
     # Hyperparameters for Ymean and Zmean
     alpha_Ymn = 1
     tau_Zmn = matrix(1, nrow=S)
@@ -77,6 +79,6 @@ sampler_init <- function(random_init, N, D, S, K, J, X_type, X){
                    "sigsq_x_vec"=sigsq_x_vec, "phi_xi"=phi_xi, "tau_xi"=tau_xi, "delta_xi"=delta_xi, 
                    "betasq_th"=betasq_th, "gammasq_th"=gammasq_th, "s_mat"=s_mat, "t"=t, "psi_lam"=psi_lam,
                    "alpha_lam"=alpha_lam, "tau_ome"=tau_ome, "delta_ome"=delta_ome, 
-                   "alpha_Ymn"=alpha_Ymn, "tau_Zmn"=tau_Zmn)
+                   "alpha_Ymn"=alpha_Ymn, "Zmean"=Zmean, "tau_Zmn"=tau_Zmn)
   return(init_list)
 }

@@ -132,7 +132,7 @@ run_bs3fa <- function(X, Y, K, J, X_type=rep("continuous", nrow(X)), post_proces
   init_list = sampler_init(random_init, N, D, S, K, J, X_type, X)
   list2env(init_list, environment()) # puts list elements in environment
   g_xi = g_psi = 1; l_init=D*0.0008;
-  covDD = covDD_Ymn = get_covDD(matrix(dvec_unique), l_init);
+  covDD = covDD_Ymn = get_covDD(matrix(dvec_unique), l_init)
   
   # Set up framework to sample the length-scale, if user sets num_ls_opts > 1
   if(num_ls_opts>1){
@@ -189,7 +189,7 @@ run_bs3fa <- function(X, Y, K, J, X_type=rep("continuous", nrow(X)), post_proces
       print(paste(sep="",bad_samps," bad samples"))
     }
     
-    ##### Update mean vectors and associated hyper-params #####
+    ##### Sample mean of Y, Y-specific factor loading matrix \Lambda and shrinkage params  #####
     
     # Mean of Y and mean-centered Y
     Ymean = sample_meanY(Y, Lambda, eta, sigsq_y_vec, alpha_Ymn*covDD_Ymn, obs_Y)
@@ -202,13 +202,6 @@ run_bs3fa <- function(X, Y, K, J, X_type=rep("continuous", nrow(X)), post_proces
     }
     # Length-scale for the mean of Y
     alpha_Ymn = 1/sample_psi_Ymn(g_psi, Ymean, covDD_Ymn, nugget)
-    
-    # Mean of Z and mean-centered Z
-    Zmean = sample_meanZ(Z, Theta, eta, xi, nu, sigsq_x_vec, tau_Zmn)
-    # Precision term for the mean of Z
-    tau_Zmn = sample_tau_Zmn(Zmean)
-    
-    ##### Sample Y-specific factor loading matrix \Lambda and shrinkage params  #####
     
     # Loadings matrix
     Lam_samp = sample_Lambda_err(Ycentered, Lambda, eta, alpha_lam, sigsq_y_vec, covDD, obs_Y)
@@ -237,16 +230,21 @@ run_bs3fa <- function(X, Y, K, J, X_type=rep("continuous", nrow(X)), post_proces
       covDD = covDD_all[,,lind]
     }
     
-    ##### Sample latent variable Z corresponding to non-continuous X  #####
+    ##### Sample latent variable Z corresponding to non-continuous X, and mean of Z  #####
     
     Z_samp = sample_X(X_type, X, sigsq_x_vec, Theta, eta, xi, nu, Zmean)
     Z = Z_samp$Z
-    Zcentered = sweep(Z, 1, Zmean) # Y - Ymean
     inf_samps = inf_samps + 1*(sum(Z_samp$inf_samples)>1)
     if( inf_samps>bad_samp_tol){
       print(paste(sep="","Error: inf_samps=",inf_samps,", try increasing J"))
       return(-1)
     }
+    
+    # Mean of Z and mean-centered Z
+    Zmean = sample_meanZ(Z, Theta, eta, xi, nu, sigsq_x_vec, tau_Zmn)
+    Zcentered = sweep(Z, 1, Zmean) # Y - Ymean
+    # Precision term for the mean of Z
+    tau_Zmn = sample_tau_Zmn(Zmean)
     
     ##### Sample X-specific factor loading matrix \xi, scores \nu, and shrinkage params  #####
     

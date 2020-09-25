@@ -1112,7 +1112,7 @@ arma::mat sample_X_init(std::vector< std::string > type, arma::mat X_original, a
       arma::vec X_samp(N);
       for( int i=0; i<N; i++ ){
         double Xsi_original = Xs_original(i);
-        if( conti.compare(type[s]) != 0 ){ // If variable s is binary.
+        if( binar.compare(type[s]) == 0 ){ // If variable s is binary.
           if( Xsi_original==0 ){
             X_samp(i) = r_truncnorm(0.0, sig_xs, -inf, 0);
           } else{
