@@ -73,9 +73,9 @@ run_fpca <- function(Y, K, dvec_unique=1:nrow(Y), post_process=T, Y_format='long
   
   # Initialize parameters and define hyperparameter values
   init_list = sampler_init_fpca(random_init, N, D, K)
-  g_psi = 1
+  g_psi = 1; l_init=D*0.0008;
   list2env(init_list, environment()) # puts list elements in environment
-  covDD = get_covDD(matrix(dvec_unique), l);
+  covDD = get_covDD(matrix(dvec_unique), l_init);
   # Handle l updating
   # Set up framework to sample the length-scale, if user sets num_ls_opts > 1
   if(num_ls_opts>1){
