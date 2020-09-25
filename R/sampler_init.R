@@ -9,11 +9,11 @@ sampler_init <- function(random_init, N, D, S, K, J, X_type, X){
     Theta = matrix(rnorm(S*K, 0, small_sd), nrow=S, ncol=K)
     xi = matrix(rnorm(S*J, 0, small_sd), nrow=S, ncol=J)
     # Scores components
-    eta = matrix(rnorm(K*N, 0, small_sd), nrow=K, ncol=N)
+    eta = matrix(rnorm(K*N, 0, med_sd), nrow=K, ncol=N)
     nu = matrix(rnorm(J*N, 0, small_sd), nrow=J, ncol=N)
     # Error components
     sigsq_y_vec = matrix(med_sd^2, nrow=D, ncol=1)
-    sigsq_x_vec = matrix(small_sd^2, nrow=S, ncol=1)
+    sigsq_x_vec = matrix(med_sd^2, nrow=S, ncol=1)
     # Hyperparams for xi
     phi_xi = matrix(1, nrow=S, ncol=J)
     tau_xi = matrix(1, nrow=J, ncol=1)

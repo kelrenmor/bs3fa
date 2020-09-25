@@ -447,7 +447,7 @@ BEGIN_RCPP
 END_RCPP
 }
 // sample_X
-Rcpp::List sample_X(std::vector< std::string > type, arma::mat X_original, arma::vec sigsq_x, arma::mat Theta, arma::mat eta, arma::mat xi, arma::mat nu, arma::vec Zmean);
+arma::mat sample_X(std::vector< std::string > type, arma::mat X_original, arma::vec sigsq_x, arma::mat Theta, arma::mat eta, arma::mat xi, arma::mat nu, arma::vec Zmean);
 RcppExport SEXP _bs3fa_sample_X(SEXP typeSEXP, SEXP X_originalSEXP, SEXP sigsq_xSEXP, SEXP ThetaSEXP, SEXP etaSEXP, SEXP xiSEXP, SEXP nuSEXP, SEXP ZmeanSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;

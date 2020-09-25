@@ -1,5 +1,5 @@
 run_bs3fa <- function(X, Y, K, J, X_type=rep("continuous", nrow(X)), post_process=T,
-                      dvec_unique= if(ncol(X)==ncol(Y)) 1:nrow(Y) else sort(unique(Y[,2])),
+                      dvec_unique=if(ncol(X)==ncol(Y)) 1:nrow(Y) else sort(unique(Y[,2])),
                       nsamps_save=500, thin=10, burnin=5000, 
                       print_progress=T, save_original_data=F)
 {
@@ -95,9 +95,11 @@ run_bs3fa <- function(X, Y, K, J, X_type=rep("continuous", nrow(X)), post_proces
   num_un = apply(X, 1, function(vec) length(unique(vec)))
   # Automatically make X binary (0/1) if only two values
   for(s in 1:nrow(X)){
-    if(num_un[s]==2){
+    if( num_un[s]==2 ){
       un_vals = unique(X[s,])
-      X[s,] = 1*(X[s,] == un_vals[1]) # recode as 0/1
+      if( !( (sum(un_vals == c(0,1))==2) | (sum(un_vals == c(1,0))==2) ) ){
+        X[s,] = 1*(X[s,] == un_vals[1]) # recode as 0/1
+      }
       X_type[s] = "binary"
     }
   }
@@ -168,8 +170,8 @@ run_bs3fa <- function(X, Y, K, J, X_type=rep("continuous", nrow(X)), post_proces
   nu_save = array(NA, dim=c(J,N,nsamps_save))
   if(homo_Y){ sigsq_y_save = rep(NA, nsamps_save) }else{ sigsq_y_save = matrix(NA, nrow=D, ncol=nsamps_save) }
   sigsq_x_save = matrix(NA, nrow=S, ncol=nsamps_save)
-  Ymean_save = matrix(NA, nrow=D, ncol=nsamps_save)
-  Xmean_save = matrix(NA, nrow=D, ncol=nsamps_save)
+  Ymu_save = matrix(NA, nrow=D, ncol=nsamps_save)
+  Zmu_save = matrix(NA, nrow=S, ncol=nsamps_save)
   Y_save = DRcurve_save = array(NA, dim=c(D,N,nsamps_save))
   X_save = array(NA, dim=c(S,N,nsamps_save))
   if(num_ls_opts>1){l_save = rep(NA, nsamps_save)}else{l_save=NULL}
@@ -232,17 +234,10 @@ run_bs3fa <- function(X, Y, K, J, X_type=rep("continuous", nrow(X)), post_proces
     
     ##### Sample latent variable Z corresponding to non-continuous X, and mean of Z  #####
     
-    Z_samp = sample_X(X_type, X, sigsq_x_vec, Theta, eta, xi, nu, Zmean)
-    Z = Z_samp$Z
-    inf_samps = inf_samps + 1*(sum(Z_samp$inf_samples)>1)
-    if( inf_samps>bad_samp_tol){
-      print(paste(sep="","Error: inf_samps=",inf_samps,", try increasing J"))
-      return(-1)
-    }
-    
+    Z = sample_X(X_type, X, sigsq_x_vec, Theta, eta, xi, nu, Zmean)
     # Mean of Z and mean-centered Z
     Zmean = sample_meanZ(Z, Theta, eta, xi, nu, sigsq_x_vec, tau_Zmn)
-    Zcentered = sweep(Z, 1, Zmean) # Y - Ymean
+    Zcentered = sweep(Z, 1, Zmean) # Z - Zmean
     # Precision term for the mean of Z
     tau_Zmn = sample_tau_Zmn(Zmean)
     
@@ -296,10 +291,10 @@ run_bs3fa <- function(X, Y, K, J, X_type=rep("continuous", nrow(X)), post_proces
       nu_save[,,ind] = nu
       if(homo_Y){ sigsq_y_save[ind] = sigsq_y_vec[1] }else{ sigsq_y_save[,ind] = sigsq_y_vec }
       sigsq_x_save[,ind] = sigsq_x_vec
-      Ymean_save[,ind] = Ymean
-      Xmean_save[,ind] = Zmean
+      Ymu_save[,ind] = Ymean
+      Zmu_save[,ind] = Zmean
       Y_save[,,ind] = sample_Y_miss(Lambda, eta, sigsq_y_vec, Y, all_nobs_mat, Ymean)
-      DRcurve_save[,,ind] = Lambda %*% eta
+      DRcurve_save[,,ind] = sweep(Lambda %*% eta, 1, Ymean, "+")
       X_save[not_cont,,ind] = Z[not_cont,] # only save sampled X vals
       if(num_ls_opts>1){l_save[ind] = l}
       tau_save[,ind] = tau_ome;
@@ -372,13 +367,13 @@ run_bs3fa <- function(X, Y, K, J, X_type=rep("continuous", nrow(X)), post_proces
   DR_ll = apply(DRcurve_save,c(1,2),function(x) quantile(x, 0.025))
   DR_ul = apply(DRcurve_save,c(1,2),function(x) quantile(x, 0.975))
   
-  
   ##### Save everything in a list and return said list.
   res = list("Theta_save"=Theta_save, "Lambda_save"=Lambda_save, "eta_save"=eta_save, 
              "Xi_save" = xi_save, "nu_save" = nu_save, 
              "l_save" = l_save, "tau_save" = tau_save, "tauxi_save" = tauxi_save,
              "sigsq_y_save"=sigsq_y_save, "sigsq_x_save"=sigsq_x_save,
              "DRcurve_save"=DRcurve_save, "Y_save"=Y_save, "Z"=X_save, 
+             "Ymu_save"=Ymu_save, "Zmu_save"=Zmu_save,
              # (ABOVE) All saves for parameters
              "DRcurve_mean"=Y_mean, "DR_ll"=DR_ll, "DR_ul"=DR_ul,
              "Y_mean"=Y_mean, "Y_ll"=Y_ll, "Y_ul"=Y_ul, 

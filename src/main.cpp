@@ -1,3 +1,4 @@
+#define ARMA_DONT_PRINT_ERRORS
 #include <RcppArmadillo.h>
 #include <truncnorm.h>
 using namespace Rcpp;
@@ -1029,7 +1030,7 @@ arma::mat sample_Y_miss(arma::mat Lambda, arma::mat eta, arma::vec sigsq_y,
  */
 
 // [[Rcpp::export]]
-Rcpp::List sample_X(std::vector< std::string > type, arma::mat X_original, arma::vec sigsq_x,
+arma::mat sample_X(std::vector< std::string > type, arma::mat X_original, arma::vec sigsq_x,
                     arma::mat Theta, arma::mat eta, arma::mat xi, arma::mat nu, arma::vec Zmean){
   /* 
   * Function for sampling the latent variable x underlying x_{original}.
@@ -1045,11 +1046,9 @@ Rcpp::List sample_X(std::vector< std::string > type, arma::mat X_original, arma:
   int S = type.size();
   int N = X_original.n_cols;
   arma::mat X = X_original;
-  double inf = std::numeric_limits<double>::infinity();
   std::string conti ("continuous");
   std::string binar ("binary");
   std::string count ("count");
-  int inf_s=0; // Number of times an infinite sample is drawn (breaks sampler).
   arma::mat E_X = Theta * eta + xi * nu; // S x N (doesn't include Zmean, this gets added next line)
   for( int i=0; i<N; i++){ E_X.col(i) = E_X.col(i) + Zmean;}
   
@@ -1063,16 +1062,13 @@ Rcpp::List sample_X(std::vector< std::string > type, arma::mat X_original, arma:
         double Xsi_original = Xs_original(i);
         if( binar.compare(type[s]) == 0 ){ // If variable s is binary.
           if( Xsi_original==0 ){
-            X_samp(i) = r_truncnorm(E_Xs[i], sig_xs, -inf, 0);
-            if( is_inf(X_samp(i)) ){ X_samp(i)=-50; inf_s=inf_s+1; }
+            X_samp(i) = r_truncnorm(E_Xs[i], sig_xs, -10, 0);
           } else{
-            X_samp(i) = r_truncnorm(E_Xs[i], sig_xs, 0, inf);
-            if( is_inf(X_samp(i)) ){ X_samp(i)=50; inf_s=inf_s+1; }
+            X_samp(i) = r_truncnorm(E_Xs[i], sig_xs, 0, 10);
           }
         } else{ // If variable s is count.
           if( Xsi_original==0 ){
-            X_samp(i) = r_truncnorm(E_Xs[i], sig_xs, -inf, 0);
-            if( is_inf(X_samp(i)) ){ X_samp(i)=-50; inf_s=inf_s+1; }
+            X_samp(i) = r_truncnorm(E_Xs[i], sig_xs, -50, 0);
           } else{
             X_samp(i) = r_truncnorm(E_Xs[i], sig_xs, Xsi_original-1, Xsi_original);
           }
@@ -1082,8 +1078,7 @@ Rcpp::List sample_X(std::vector< std::string > type, arma::mat X_original, arma:
     }
   }
   
-  return Rcpp::List::create(Rcpp::Named("Z") = X,
-                            Rcpp::Named("inf_samples") = inf_s);
+  return X;
 }
 
 // [[Rcpp::export]]
@@ -1100,7 +1095,6 @@ arma::mat sample_X_init(std::vector< std::string > type, arma::mat X_original, a
   int S = type.size();
   int N = X_original.n_cols;
   arma::mat X = X_original;
-  double inf = std::numeric_limits<double>::infinity();
   std::string conti ("continuous");
   std::string binar ("binary");
   std::string count ("count");
@@ -1114,13 +1108,13 @@ arma::mat sample_X_init(std::vector< std::string > type, arma::mat X_original, a
         double Xsi_original = Xs_original(i);
         if( binar.compare(type[s]) == 0 ){ // If variable s is binary.
           if( Xsi_original==0 ){
-            X_samp(i) = r_truncnorm(0.0, sig_xs, -inf, 0);
+            X_samp(i) = r_truncnorm(0.0, sig_xs, -10, 0);
           } else{
-            X_samp(i) = r_truncnorm(0.0, sig_xs, 0, inf);
+            X_samp(i) = r_truncnorm(0.0, sig_xs, 0, 10);
           }
         } else{ // If variable s is count.
           if( Xsi_original==0 ){
-            X_samp(i) = r_truncnorm(0.0, sig_xs, -inf, 0);
+            X_samp(i) = r_truncnorm(0.0, sig_xs, -10, 0);
           } else{
             X_samp(i) = r_truncnorm(Xsi_original+0.5, sig_xs, Xsi_original-1, Xsi_original);
           }
