@@ -9,7 +9,7 @@ sampler_init <- function(random_init, N, D, S, K, J, X_type, X){
     Theta = matrix(rnorm(S*K, 0, small_sd), nrow=S, ncol=K)
     xi = matrix(rnorm(S*J, 0, small_sd), nrow=S, ncol=J)
     # Scores components
-    eta = matrix(rnorm(K*N, 0, med_sd), nrow=K, ncol=N)
+    eta = matrix(rnorm(K*N, 0, small_sd), nrow=K, ncol=N)
     nu = matrix(rnorm(J*N, 0, small_sd), nrow=J, ncol=N)
     # Error components
     sigsq_y_vec = matrix(med_sd^2, nrow=D, ncol=1)
@@ -32,6 +32,9 @@ sampler_init <- function(random_init, N, D, S, K, J, X_type, X){
     delta_ome = matrix(1, nrow=K, ncol=1)
     # Latent variable Z for non-continuous X
     Z = sample_X_init(X_type, X, sigsq_x_vec)
+    # Hyperparameters for Ymean and Zmean
+    alpha_Ymn = 1
+    tau_Zmn = matrix(1, nrow=S)
     
   } else{ # INITIALIZE TO SVD SOLUTIONS
     svd_xy = svd(rbind(X,Y))
@@ -65,11 +68,15 @@ sampler_init <- function(random_init, N, D, S, K, J, X_type, X){
     tau_ome = matrix(1, nrow=K, ncol=1)
     delta_ome = matrix(1, nrow=K, ncol=1)
     Z = sample_X_init(X_type, X, sigsq_x_vec)
+    # Hyperparameters for Ymean and Zmean
+    alpha_Ymn = 1
+    tau_Zmn = matrix(1, nrow=S)
   }
 
   init_list = list("Lambda"=Lambda, "Theta"=Theta, "xi"=xi, "eta"=eta, "nu"=nu, "sigsq_y_vec"=sigsq_y_vec, 
                    "sigsq_x_vec"=sigsq_x_vec, "phi_xi"=phi_xi, "tau_xi"=tau_xi, "delta_xi"=delta_xi, 
                    "betasq_th"=betasq_th, "gammasq_th"=gammasq_th, "s_mat"=s_mat, "t"=t, "psi_lam"=psi_lam,
-                   "alpha_lam"=alpha_lam, "tau_ome"=tau_ome, "delta_ome"=delta_ome)
+                   "alpha_lam"=alpha_lam, "tau_ome"=tau_ome, "delta_ome"=delta_ome, 
+                   "alpha_Ymn"=alpha_Ymn, "tau_Zmn"=tau_Zmn)
   return(init_list)
 }

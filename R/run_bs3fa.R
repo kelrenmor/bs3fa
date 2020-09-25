@@ -144,7 +144,7 @@ run_bs3fa <- function(X, Y, K, J, X_type=rep("continuous", nrow(X)), post_proces
   init_list = sampler_init(random_init, N, D, S, K, J, X_type, X)
   list2env(init_list, environment()) # puts list elements in environment
   g_xi = g_psi = 1; 
-  covDD = get_covDD(matrix(dvec_unique), l);
+  covDD = covDD_Ymn = get_covDD(matrix(dvec_unique), l);
   
   # Set up framework to sample the length-scale, if user sets num_ls_opts > 1
   if(num_ls_opts>1){
@@ -194,6 +194,8 @@ run_bs3fa <- function(X, Y, K, J, X_type=rep("continuous", nrow(X)), post_proces
   nu_save = array(NA, dim=c(J,N,nsamps_save))
   if(homo_Y){ sigsq_y_save = rep(NA, nsamps_save) }else{ sigsq_y_save = matrix(NA, nrow=D, ncol=nsamps_save) }
   sigsq_x_save = matrix(NA, nrow=S, ncol=nsamps_save)
+  Ymean_save = matrix(NA, nrow=D, ncol=nsamps_save)
+  Xmean_save = matrix(NA, nrow=D, ncol=nsamps_save)
   Y_save = DRcurve_save = array(NA, dim=c(D,N,nsamps_save))
   X_save = array(NA, dim=c(S,N,nsamps_save))
   if(num_ls_opts>1){l_save = rep(NA, nsamps_save)}else{l_save=NULL}
@@ -214,11 +216,31 @@ run_bs3fa <- function(X, Y, K, J, X_type=rep("continuous", nrow(X)), post_proces
       print(paste(sep="",bad_samps," bad samples"))
     }
     
-    ##### Update length-scale hyperparameter to be as 'smooth' as possible.
+    ##### Update mean vectors and associated hyper-params #####
+    
+    # Mean of Y and mean-centered Y
+    Ymean = sample_meanY(Y, Lambda, eta, sigsq_y_vec, alpha_Ymn*covDD_Ymn, obs_Y)
+    Ycentered = sweep(Y, 1, Ymean) # Y - Ymean
+    # Length-scale for the mean of Y
+    if( (num_ls_opts>1) & (ss>reset_ls) ){ 
+      lind = sample_lind(Ymean, alpha_Ymn, covDDinv_all, logdetCovDD_all)
+      l = l_opts[lind]
+      covDD_Ymn = covDD_all[,,lind]
+    }
+    # Length-scale for the mean of Y
+    alpha_Ymn = 1/sample_psi_Ymn(g_psi, Ymean, covDD_Ymn, nugget)
+    
+    # Mean of Z and mean-centered Z
+    Zmean = sample_meanZ(Z, Theta, eta, xi, nu, sigsq_x_vec, tau_Zmn)
+    # Precision term for the mean of Z
+    tau_Zmn = sample_tau_Zmn(Zmean)
+    
+    ##### Update length-scale hyperparameter to be as 'smooth' as possible if you don't sample it.
+    
     if( init & update_ls_bool ){ 
       if( ss>reset_ls ){
         if( (update_ls[["type"]]=="auto") & (!(num_ls_opts>1)) ){
-          l = update_l(l, l_diff, dvec_unique, niter_max, Y, Lambda, eta, 
+          l = update_l(l, l_diff, dvec_unique, niter_max, Ycentered, Lambda, eta, 
                        alpha_lam_tmp, sigsq_y_vec, obs_Y)
         } else{ l = l_new }
         covDD = get_covDD(matrix(dvec_unique), l)
@@ -229,7 +251,7 @@ run_bs3fa <- function(X, Y, K, J, X_type=rep("continuous", nrow(X)), post_proces
     ##### Sample Y-specific factor loading matrix \Lambda and shrinkage params  #####
     
     # Loadings matrix
-    Lam_samp = sample_Lambda_err(Y, Lambda, eta, alpha_lam, sigsq_y_vec, covDD, obs_Y)
+    Lam_samp = sample_Lambda_err(Ycentered, Lambda, eta, alpha_lam, sigsq_y_vec, covDD, obs_Y)
     Lambda = Lam_samp$Lambda
     bad_samps = bad_samps + Lam_samp$bad
     if( bad_samps>bad_samp_tol){
@@ -257,8 +279,9 @@ run_bs3fa <- function(X, Y, K, J, X_type=rep("continuous", nrow(X)), post_proces
     
     ##### Sample latent variable Z corresponding to non-continuous X  #####
     
-    Z_samp = sample_X(X_type, X, sigsq_x_vec, Theta, eta, xi, nu)
+    Z_samp = sample_X(X_type, X, sigsq_x_vec, Theta, eta, xi, nu, Zmean)
     Z = Z_samp$Z
+    Zcentered = sweep(Z, 1, Zmean) # Y - Ymean
     inf_samps = inf_samps + 1*(sum(Z_samp$inf_samples)>1)
     if( inf_samps>bad_samp_tol){
       print(paste(sep="","Error: inf_samps=",inf_samps,", try increasing J"))
@@ -268,9 +291,9 @@ run_bs3fa <- function(X, Y, K, J, X_type=rep("continuous", nrow(X)), post_proces
     ##### Sample X-specific factor loading matrix \xi, scores \nu, and shrinkage params  #####
     
     # Score vectors
-    nu = sample_nu_all(Z, xi, eta, Theta, sigsq_x_vec)
+    nu = sample_nu_all(Zcentered, xi, eta, Theta, sigsq_x_vec)
     # Loadings matrix
-    xi = sample_xi(Z, nu, eta, Theta, sigsq_x_vec, phi_xi, tau_xi)
+    xi = sample_xi(Zcentered, nu, eta, Theta, sigsq_x_vec, phi_xi, tau_xi)
     # Hyper-params
     phi_xi = sample_phi_xi(g_xi, tau_xi, xi)
     delta_xi = sample_delta_xi(a1_delta_xi, a2_delta_xi, xi, phi_xi, delta_xi)
@@ -279,7 +302,7 @@ run_bs3fa <- function(X, Y, K, J, X_type=rep("continuous", nrow(X)), post_proces
     ##### Sample X-specific factor loading matrix \Theta and shrinkage params  #####
     
     # Loadings matrix
-    Theta = sample_Theta(Z, nu, eta, xi, sigsq_x_vec, betasq_th, gammasq_th, tau_ome)
+    Theta = sample_Theta(Zcentered, nu, eta, xi, sigsq_x_vec, betasq_th, gammasq_th, tau_ome)
     # Hyper-params (note delta_ome (and thus tau_ome) sampled in Lambda region later)
     betasq_th = sample_betasq_th(t, Theta, gammasq_th, tau_ome)
     gammasq_th = sample_gammasq_th(s_mat, Theta, betasq_th, tau_ome)
@@ -289,21 +312,21 @@ run_bs3fa <- function(X, Y, K, J, X_type=rep("continuous", nrow(X)), post_proces
     
     ##### Sample shared factor score eta = [\eta_1, ..., \eta_N] #####
     
-    eta = sample_eta_all(Y, Z, xi, nu, Lambda, Theta, sigsq_y_vec, sigsq_x_vec, obs_Y)
+    eta = sample_eta_all(Ycentered, Zcentered, xi, nu, Lambda, Theta, sigsq_y_vec, sigsq_x_vec, obs_Y)
     
     ##### Sample error terms #####
 
     # Error terms for Y
     if(longY){
-      Y_min_mu = get_Y_min_mu_long(Y_long, Lambda, eta, IDs_long, dind_long)
+      Y_min_mu = get_Y_min_mu_long(Y_long, Lambda, eta, IDs_long, dind_long, Ymean)
       sigsq_y_vec = sample_sigsq_longy(a_y, b_y, Y_min_mu, dind_long, homo_Y, D)
     } else{
-      Y_min_mu = get_Y_min_mu(Y, Lambda, eta)
+      Y_min_mu = get_Y_min_mu(Ycentered, Lambda, eta)
       sigsq_y_vec = sample_sigsq_y(a_y, b_y, Y_min_mu, obs_Y, homo_Y)
     }
     
     # Error terms for X
-    X_min_mu = get_X_min_mu(Z, Theta, eta, xi, nu)
+    X_min_mu = get_X_min_mu(Z, Theta, eta, xi, nu, Zmean)
     sigsq_x_vec = sample_sigsq_x(a_sig_x, b_sig_x, X_min_mu, X_type)
     
     ##### Save samples #####
@@ -315,7 +338,9 @@ run_bs3fa <- function(X, Y, K, J, X_type=rep("continuous", nrow(X)), post_proces
       nu_save[,,ind] = nu
       if(homo_Y){ sigsq_y_save[ind] = sigsq_y_vec[1] }else{ sigsq_y_save[,ind] = sigsq_y_vec }
       sigsq_x_save[,ind] = sigsq_x_vec
-      Y_save[,,ind] = sample_Y_miss(Lambda, eta, sigsq_y_vec, Y, all_nobs_mat)
+      Ymean_save[,ind] = Ymean
+      Xmean_save[,ind] = Xmean
+      Y_save[,,ind] = sample_Y_miss(Lambda, eta, sigsq_y_vec, Y, all_nobs_mat, Ymean)
       DRcurve_save[,,ind] = Lambda %*% eta
       X_save[not_cont,,ind] = Z[not_cont,] # only save sampled X vals
       if(num_ls_opts>1){l_save[ind] = l}

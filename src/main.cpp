@@ -63,12 +63,13 @@ arma::vec sample_sigsq_x(double a_sig, double b_sig, arma::mat D_min_mu,
   int P = D_min_mu.n_rows;
   int N = D_min_mu.n_cols;
   arma::vec sigsq_all(P);
+  sigsq_all.fill(1.0); // This will be refilled with something else if variable is not binary.
   std::string bin ("binary"); 
   for( int p=0; p<P; p++ ){
     if( bin.compare(type[p]) != 0 ){ // If variable p is NOT binary, sample sigsq.
       double RSS = sum( square( D_min_mu.row(p) ) );
       sigsq_all(p) = sample_sigsq_p(a_sig, b_sig, N, RSS);
-    } else{ sigsq_all(p) = 1.0; } // Else if it is binary, set to 1.
+    }
   }
   return sigsq_all;
 }
@@ -160,23 +161,26 @@ arma::vec sample_sigsq_longy(double a_sig, double b_sig, arma::vec D_min_mu_long
 
 // [[Rcpp::export]]
 arma::mat get_X_min_mu(arma::mat X, arma::mat Theta, arma::mat eta,
-                       arma::mat xi, arma::mat nu) {
+                       arma::mat xi, arma::mat nu, arma::vec Zmean) {
   /* Get the value of X minus its mean (given all mean params Gibbs).
   * 
-  */ 
-  return X - ( Theta*eta + xi*nu );
+  */
+  int N = X.n_cols;
+  arma::mat E_X = Theta * eta + xi * nu; // S x N (doesn't include Zmean, this gets added next line)
+  for( int i=0; i<N; i++){ E_X.col(i) = E_X.col(i) + Zmean; }
+  return X - E_X;
 }
 
 // [[Rcpp::export]]
 arma::vec get_Y_min_mu_long(arma::vec Y_long, arma::mat Lambda, arma::mat eta,
-                            arma::ivec IDs_long, arma::ivec dind_long) {
+                            arma::ivec IDs_long, arma::ivec dind_long, arma::vec Ymean) {
   /* Get the value of Y minus its mean (given all mean params Gibbs).
-  * 
-  */ 
+   * 
+   */ 
   int N_long = Y_long.n_rows;
   arma::mat mu = Lambda*eta; // D times N
   arma::vec Y_min_mu_long(N_long);
-  for(int i=0; i<N_long; i++){ Y_min_mu_long(i) = Y_long(i) - mu( dind_long(i), IDs_long(i) ); }
+  for(int i=0; i<N_long; i++){ Y_min_mu_long(i) = Y_long(i) - mu( dind_long(i), IDs_long(i) ) - Ymean( dind_long(i) ); }
   return Y_min_mu_long;
 }
 
@@ -314,7 +318,6 @@ arma::mat sample_xi(arma::mat X, arma::mat nu, arma::mat eta, arma::mat Theta,
   arma::vec sigsq_x_inv = pow(sigsq_x, -1.0);
   int S = D.n_rows;
   int J = nu.n_rows;
-  int N = D.n_cols;
   arma::mat xi(S,J);
   arma::mat nu_nuT = nu * nu.t();
   arma::mat SigInv(J,J);
@@ -420,7 +423,6 @@ arma::mat sample_Theta(arma::mat X, arma::mat nu, arma::mat eta, arma::mat xi, a
   arma::mat eta_t = eta.t(); // N x J
   int S = D.n_rows;
   int K = eta.n_rows;
-  int N = D.n_cols;
   arma::mat Theta(S,K);
   arma::mat eta_etaT = eta * eta_t;
   arma::mat SigInv(K,K);
@@ -533,16 +535,163 @@ arma::mat sample_s_mat(arma::mat gammasq_th) {
 double sample_t(double betasq_th) {
   /* 
   * Function for sampling hyper-prior for betasq_th, from Makalic paper.
-  * A priori betasq_th|t ~ IG(1/2,1/t).
+  * A priori betasq_th|t ~ IG(1/2,1/t), t ~ IG(1/2,1/2)
   * 
   */
-  double t;
   double shape = 1.0;
   double rate = 1.0 + 1.0/betasq_th;
   betasq_th = arma::randg( 1,arma::distr_param(shape,1/rate) )(0);
   
   return 1/betasq_th; // INVERSE gamma distributed bc variance term
 }
+
+/* *********** MEAN SAMPLING FUNCTIONS *********** 
+ * 
+ * Used for sampling the mean of Y and X, getting covariance matrix
+ * for GP for Y, and sampling associated hyper-parameters.
+ * Specifically, YplusMean = Ymean + Lambda eta + epsilon and 
+ * XplusMean = Xmean + Theta eta + Xi nu + e.
+ * 
+ */
+
+// [[Rcpp::export]]
+arma::vec sample_meanY(arma::mat YplusMean, arma::mat Lambda, arma::mat eta, 
+                       arma::vec sigsq_y, arma::mat alphCovDD, arma::mat obs_Y){
+  /* 
+   * Function for sampling D-dimensional mean vector for Y assuming a GP prior.
+   * YplusMean is D x N matrix of data.
+   * Lambda is D x K factor loadings matrix.
+   * eta is K x N matrix where column N is the length-K vec \eta_i associated with obs i.
+   * alphCovDD is the D x D matrix with entry (d, d') being sig*exp(-r||d-d'||^2).
+   * sigsq_y is the D vector of variance terms for Y.
+   * obs_Y is the D x N matrix where (d,i) is 1 if Y is observed and 0 else.
+   * 
+   */
+  int D = YplusMean.n_rows;
+  int N = YplusMean.n_cols;
+  arma::mat Yst = YplusMean - Lambda*eta;
+  arma::vec S_st(D);
+  arma::vec w_sum(D);
+  arma::vec gp_mu(D);
+  arma::mat gp_cov(D,D);
+  S_st.fill(0.0);
+  w_sum.fill(0.0);
+  
+  // Only count elements that are observed 
+  for( int i=0; i<N; i++ ){ 
+    for( int d=0; d<D; d++ ){
+      double obs_Y_tmp = obs_Y(d,i);
+      if( obs_Y_tmp>0 ){
+        double w_tmp = (obs_Y_tmp / sigsq_y(d)); // inverse variance weights
+        S_st(d) += w_tmp * Yst(d,i);
+        w_sum(d) += w_tmp;
+      }
+    }
+  }
+  arma::vec w_sum_inv = 1/w_sum; // D-dimensional
+  S_st = S_st % w_sum_inv; // % is element-wise multiplication
+  // Calculate GP mean and covariance.
+  arma::mat tmp_mult = alphCovDD;
+  for( int d=0; d<D; d++ ){ tmp_mult(d,d) += w_sum_inv(d); } // + nugget(d)
+  tmp_mult = alphCovDD * tmp_mult.i();
+  gp_mu = tmp_mult * S_st;
+  gp_cov = alphCovDD - tmp_mult * alphCovDD;
+  
+  return arma::mvnrnd(gp_mu, gp_cov, 1); // Ymean
+}
+
+// [[Rcpp::export]]
+double sample_psi_Ymn(double g, arma::vec Ymean, 
+                      arma::mat covDD, double nugget){
+  /* 
+   * Function for sampling global precision term psi_ymn, 
+   * for Ymean ~ GP(0_D, c_k()) where c_k(d,d') = (1/psi_ymn) exp(-r||d-d'||^2).
+   * Here covDD is the matrix with entry (i,j) being exp(-r*||d_i-d_j||^2),
+   * A priori, psi_lam ~ Ga(g/2, g/2).
+   * nugget is the value added to the diagonal for computational stability.
+   * 
+   */
+  
+  int D = Ymean.n_rows;
+  covDD.diag() += nugget;
+  arma::mat covDD_inv = covDD.i();
+  double shape;
+  double rate;
+  double samp;
+  
+  // Specify shape parameter and rate parameter.
+  shape = (g+D)/2.0;
+  rate = g/2.0;
+  rate += ((Ymean.t() * covDD_inv * Ymean )/2.0).eval()(0);
+  
+  samp = arma::randg( 1,arma::distr_param(shape,1/rate) )(0);
+  return samp;
+}
+
+// [[Rcpp::export]]
+arma::vec sample_meanZ(arma::mat ZplusMean, arma::mat Theta, arma::mat eta, 
+                       arma::mat xi, arma::mat nu, arma::vec sigsq_z, arma::vec tau_Zmn){
+  /* 
+   * Function for sampling S-dimensional mean vector for Z assuming a N(0,1/tau_s) prior.
+   * ZplusMean is S x N matrix of data.
+   * Theta is S x K factor loadings matrix.
+   * eta is K x N matrix where column N is the length-K vec \eta_i associated with obs i.
+   * xi is S x J factor loadings matrix.
+   * nu is J x N matrix where column N is the length-J vec \nu_i associated with obs i.
+   * sigsq_z is the D vector of variance terms for Z.
+   * tau_Zmn is the S vector of precision terms for Zmean.
+   * 
+   */
+  int S = ZplusMean.n_rows;
+  int N = ZplusMean.n_cols;
+  arma::mat Zst = ZplusMean - (Theta * eta + xi * nu); // S x N
+  arma::vec Zmean(S);
+  arma::vec Ztmp(N);
+  double tau_s;
+  double sigsq_s;
+  double post_mean;
+  double post_sigsq;
+  
+  // Only count elements that are observed 
+  for( int s=0; s<S; s++ ){
+    Ztmp = Zst.row(s);
+    tau_s = tau_Zmn(s);
+    sigsq_s = sigsq_z(s);
+    post_sigsq = 1.0 / ( 1.0/tau_s + N/sigsq_s );
+    post_mean = post_sigsq * arma::sum(Ztmp) / sigsq_s;
+    Zmean(s) = rnormArma(post_mean, post_sigsq);
+  }
+  
+  return Zmean;
+}
+
+// [[Rcpp::export]]
+arma::vec sample_tau_Zmn(arma::vec Zmean) {
+  /* 
+   * Function for sampling local variance term gammasq_th, from Makalic paper.
+   * A priori gammasq_th_{sk}|s_{sk} ~ IG(1/2,1/s_{sk}).
+   * Theta and gamma_th (variance term) are S x K, tau_th is K x 1 (precision term).
+   * Note that arma::randg uses scale parameterization, i.e. 1/rate.
+   * 
+   */
+  int S = Zmean.n_rows;
+  arma::vec tau_Zmn(S);
+  double shape;
+  double rate;
+  
+  // Specify shape and initial rate parameters
+  shape = 1.0;
+  
+  // Calculate the components of the Gamma posterior
+  for( int s=0; s<S; s++ ){
+    rate = 0.5 + Zmean(s)*Zmean(s)/2.0;
+    tau_Zmn(s) = arma::randg( 1,arma::distr_param(shape,1/rate) )(0);
+  }
+  
+  return tau_Zmn; // Precision term
+}
+
+    
 
 /* *********** LAMBDA SAMPLING FUNCTIONS *********** 
  * 
@@ -843,7 +992,7 @@ arma::vec sample_delta_ome(double a1, double a2, arma::vec delta_ome,
 
 // [[Rcpp::export]]
 arma::mat sample_Y_miss(arma::mat Lambda, arma::mat eta, arma::vec sigsq_y,
-                        arma::mat Y, arma::mat obs_Y){
+                        arma::mat Y, arma::mat obs_Y, arma::vec Ymean){
   /* 
   * Function for sampling Y when Y isn't observed at all locations.
   * Actual relationship: Y = Lambda_true %*% eta_true + e_y.
@@ -851,6 +1000,7 @@ arma::mat sample_Y_miss(arma::mat Lambda, arma::mat eta, arma::vec sigsq_y,
   * Eta is the K x N matrix of factor scores.
   * sigsq_y is the D x 1 vector of error variance terms.
   * obs_Y is the D x N matrix where (d,i) is n (n is the no of times chem i is observed at dose d).
+  * Ymean is the D x 1 vector with the mean of Y, i.e. Y = Ymean + Lambda eta + epsilon.
   * 
   */
   
@@ -864,14 +1014,13 @@ arma::mat sample_Y_miss(arma::mat Lambda, arma::mat eta, arma::vec sigsq_y,
     double sigsq_y_d = sigsq_y(d);
     for( int n=0; n<N; n++ ){
       if( obs_Y_d(n)==0 ){ // If Y(d,n) is not observed...
-        Y_samp(d,n) = rnormArma(E_Y(d,n), sigsq_y_d);
+        Y_samp(d,n) = rnormArma(E_Y(d,n) + Ymean(d), sigsq_y_d);
       }
     } // for( int n=0; n<N; n++ ){
   } // for( int d=0; d<D; d++ ){
   
   return Y_samp;
 }
-
 
 /* *********** SAMPLING LATENT VARS FOR NON-NORMAL DATA *********** 
  * 
@@ -881,7 +1030,7 @@ arma::mat sample_Y_miss(arma::mat Lambda, arma::mat eta, arma::vec sigsq_y,
 
 // [[Rcpp::export]]
 Rcpp::List sample_X(std::vector< std::string > type, arma::mat X_original, arma::vec sigsq_x,
-                    arma::mat Theta, arma::mat eta, arma::mat xi, arma::mat nu){
+                    arma::mat Theta, arma::mat eta, arma::mat xi, arma::mat nu, arma::vec Zmean){
   /* 
   * Function for sampling the latent variable x underlying x_{original}.
   * For binary x_{original}, x|{all},x_o=0 ~ N_(E[x_o], 1) and x|{all},x_o=1 ~ N+(E[x_o], 1).
@@ -896,13 +1045,14 @@ Rcpp::List sample_X(std::vector< std::string > type, arma::mat X_original, arma:
   int S = type.size();
   int N = X_original.n_cols;
   arma::mat X = X_original;
-  arma::mat E_X = Theta * eta + xi * nu; // S x N
   double inf = std::numeric_limits<double>::infinity();
   std::string conti ("continuous");
   std::string binar ("binary");
   std::string count ("count");
   int inf_s=0; // Number of times an infinite sample is drawn (breaks sampler).
-
+  arma::mat E_X = Theta * eta + xi * nu; // S x N (doesn't include Zmean, this gets added next line)
+  for( int i=0; i<N; i++){ E_X.col(i) = E_X.col(i) + Zmean;}
+  
   for( int s=0; s<S; s++ ){
     if( conti.compare(type[s]) != 0 ){ // If variable s is NOT continuous.
       arma::vec E_Xs = E_X.row(s).t();
@@ -911,7 +1061,7 @@ Rcpp::List sample_X(std::vector< std::string > type, arma::mat X_original, arma:
       arma::vec X_samp(N);
       for( int i=0; i<N; i++ ){
         double Xsi_original = Xs_original(i);
-        if( conti.compare(type[s]) != 0 ){ // If variable s is binary.
+        if( binar.compare(type[s]) == 0 ){ // If variable s is binary.
           if( Xsi_original==0 ){
             X_samp(i) = r_truncnorm(E_Xs[i], sig_xs, -inf, 0);
             if( is_inf(X_samp(i)) ){ X_samp(i)=-50; inf_s=inf_s+1; }

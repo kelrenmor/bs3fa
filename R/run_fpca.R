@@ -80,6 +80,7 @@ run_fpca <- function(Y, K, dvec_unique=1:nrow(Y), post_process=T, Y_format='long
   dvec_unique_original=dvec_unique
   dvec_unique=(dvec_unique-min(dvec_unique))/(max(dvec_unique)-min(dvec_unique))
   norm_rescale=1 # legacy from other code with X involved
+  Ymean = matrix(0,D) # Note should re-write this code to allow for a separate mean term.
   
   # Initialize parameters and define hyperparameter values
   init_list = sampler_init_fpca(random_init, N, D, K)
@@ -196,7 +197,7 @@ run_fpca <- function(Y, K, dvec_unique=1:nrow(Y), post_process=T, Y_format='long
     # Error terms for Y
     Y_min_mu = get_Y_min_mu(Y, Lambda, eta)
     if(longY){
-      Y_min_mu = get_Y_min_mu_long(Y_long, Lambda, eta, IDs_long, dind_long)
+      Y_min_mu = get_Y_min_mu_long(Y_long, Lambda, eta, IDs_long, dind_long, Ymean)
       sigsq_y_vec = sample_sigsq_longy(a_sig_y, b_sig_y, Y_min_mu, obs_Y, homo_Y, D)
     } else{
       Y_min_mu = get_Y_min_mu(Y, Lambda, eta)
@@ -208,7 +209,7 @@ run_fpca <- function(Y, K, dvec_unique=1:nrow(Y), post_process=T, Y_format='long
       Lambda_save[,,ind] = Lambda
       eta_save[,,ind] = eta
       if(homo_Y){ sigsq_y_save[ind] = sigsq_y_vec[1] }else{ sigsq_y_save[,ind] = sigsq_y_vec }
-      Y_save[,,ind] = sample_Y_miss(Lambda, eta, sigsq_y_vec, Y, obs_Y)
+      Y_save[,,ind] = sample_Y_miss(Lambda, eta, sigsq_y_vec, Y, obs_Y, Ymean)
       ind = ind + 1
     }
     
