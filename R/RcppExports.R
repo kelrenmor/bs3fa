@@ -25,12 +25,12 @@ sample_sigsq_longy <- function(a_sig, b_sig, D_min_mu_long, dind_long, homo_var,
     .Call(`_bs3fa_sample_sigsq_longy`, a_sig, b_sig, D_min_mu_long, dind_long, homo_var, P)
 }
 
-get_X_min_mu <- function(X, Theta, eta, xi, nu) {
-    .Call(`_bs3fa_get_X_min_mu`, X, Theta, eta, xi, nu)
+get_X_min_mu <- function(X, Theta, eta, xi, nu, Zmean) {
+    .Call(`_bs3fa_get_X_min_mu`, X, Theta, eta, xi, nu, Zmean)
 }
 
-get_Y_min_mu_long <- function(Y_long, Lambda, eta, IDs_long, dind_long) {
-    .Call(`_bs3fa_get_Y_min_mu_long`, Y_long, Lambda, eta, IDs_long, dind_long)
+get_Y_min_mu_long <- function(Y_long, Lambda, eta, IDs_long, dind_long, Ymean) {
+    .Call(`_bs3fa_get_Y_min_mu_long`, Y_long, Lambda, eta, IDs_long, dind_long, Ymean)
 }
 
 get_Y_min_mu <- function(Y, Lambda, eta) {
@@ -81,6 +81,22 @@ sample_t <- function(betasq_th) {
     .Call(`_bs3fa_sample_t`, betasq_th)
 }
 
+sample_meanY <- function(YplusMean, Lambda, eta, sigsq_y, alphCovDD, obs_Y) {
+    .Call(`_bs3fa_sample_meanY`, YplusMean, Lambda, eta, sigsq_y, alphCovDD, obs_Y)
+}
+
+sample_psi_Ymn <- function(g, Ymean, covDD, nugget) {
+    .Call(`_bs3fa_sample_psi_Ymn`, g, Ymean, covDD, nugget)
+}
+
+sample_meanZ <- function(ZplusMean, Theta, eta, xi, nu, sigsq_z, tau_Zmn) {
+    .Call(`_bs3fa_sample_meanZ`, ZplusMean, Theta, eta, xi, nu, sigsq_z, tau_Zmn)
+}
+
+sample_tau_Zmn <- function(Zmean) {
+    .Call(`_bs3fa_sample_tau_Zmn`, Zmean)
+}
+
 get_covDD <- function(d_vec, l) {
     .Call(`_bs3fa_get_covDD`, d_vec, l)
 }
@@ -101,12 +117,12 @@ sample_delta_ome <- function(a1, a2, delta_ome, psi_lam, Lambda, covDD, nugget, 
     .Call(`_bs3fa_sample_delta_ome`, a1, a2, delta_ome, psi_lam, Lambda, covDD, nugget, Theta, betasq_th, gammasq_th)
 }
 
-sample_Y_miss <- function(Lambda, eta, sigsq_y, Y, obs_Y) {
-    .Call(`_bs3fa_sample_Y_miss`, Lambda, eta, sigsq_y, Y, obs_Y)
+sample_Y_miss <- function(Lambda, eta, sigsq_y, Y, obs_Y, Ymean) {
+    .Call(`_bs3fa_sample_Y_miss`, Lambda, eta, sigsq_y, Y, obs_Y, Ymean)
 }
 
-sample_X <- function(type, X_original, sigsq_x, Theta, eta, xi, nu) {
-    .Call(`_bs3fa_sample_X`, type, X_original, sigsq_x, Theta, eta, xi, nu)
+sample_X <- function(type, X_original, sigsq_x, Theta, eta, xi, nu, Zmean) {
+    .Call(`_bs3fa_sample_X`, type, X_original, sigsq_x, Theta, eta, xi, nu, Zmean)
 }
 
 sample_X_init <- function(type, X_original, sigsq_x) {

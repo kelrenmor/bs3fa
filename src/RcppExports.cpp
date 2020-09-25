@@ -89,8 +89,8 @@ BEGIN_RCPP
 END_RCPP
 }
 // get_X_min_mu
-arma::mat get_X_min_mu(arma::mat X, arma::mat Theta, arma::mat eta, arma::mat xi, arma::mat nu);
-RcppExport SEXP _bs3fa_get_X_min_mu(SEXP XSEXP, SEXP ThetaSEXP, SEXP etaSEXP, SEXP xiSEXP, SEXP nuSEXP) {
+arma::mat get_X_min_mu(arma::mat X, arma::mat Theta, arma::mat eta, arma::mat xi, arma::mat nu, arma::vec Zmean);
+RcppExport SEXP _bs3fa_get_X_min_mu(SEXP XSEXP, SEXP ThetaSEXP, SEXP etaSEXP, SEXP xiSEXP, SEXP nuSEXP, SEXP ZmeanSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -99,13 +99,14 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< arma::mat >::type eta(etaSEXP);
     Rcpp::traits::input_parameter< arma::mat >::type xi(xiSEXP);
     Rcpp::traits::input_parameter< arma::mat >::type nu(nuSEXP);
-    rcpp_result_gen = Rcpp::wrap(get_X_min_mu(X, Theta, eta, xi, nu));
+    Rcpp::traits::input_parameter< arma::vec >::type Zmean(ZmeanSEXP);
+    rcpp_result_gen = Rcpp::wrap(get_X_min_mu(X, Theta, eta, xi, nu, Zmean));
     return rcpp_result_gen;
 END_RCPP
 }
 // get_Y_min_mu_long
-arma::vec get_Y_min_mu_long(arma::vec Y_long, arma::mat Lambda, arma::mat eta, arma::ivec IDs_long, arma::ivec dind_long);
-RcppExport SEXP _bs3fa_get_Y_min_mu_long(SEXP Y_longSEXP, SEXP LambdaSEXP, SEXP etaSEXP, SEXP IDs_longSEXP, SEXP dind_longSEXP) {
+arma::vec get_Y_min_mu_long(arma::vec Y_long, arma::mat Lambda, arma::mat eta, arma::ivec IDs_long, arma::ivec dind_long, arma::vec Ymean);
+RcppExport SEXP _bs3fa_get_Y_min_mu_long(SEXP Y_longSEXP, SEXP LambdaSEXP, SEXP etaSEXP, SEXP IDs_longSEXP, SEXP dind_longSEXP, SEXP YmeanSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -114,7 +115,8 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< arma::mat >::type eta(etaSEXP);
     Rcpp::traits::input_parameter< arma::ivec >::type IDs_long(IDs_longSEXP);
     Rcpp::traits::input_parameter< arma::ivec >::type dind_long(dind_longSEXP);
-    rcpp_result_gen = Rcpp::wrap(get_Y_min_mu_long(Y_long, Lambda, eta, IDs_long, dind_long));
+    Rcpp::traits::input_parameter< arma::vec >::type Ymean(YmeanSEXP);
+    rcpp_result_gen = Rcpp::wrap(get_Y_min_mu_long(Y_long, Lambda, eta, IDs_long, dind_long, Ymean));
     return rcpp_result_gen;
 END_RCPP
 }
@@ -289,6 +291,64 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// sample_meanY
+arma::vec sample_meanY(arma::mat YplusMean, arma::mat Lambda, arma::mat eta, arma::vec sigsq_y, arma::mat alphCovDD, arma::mat obs_Y);
+RcppExport SEXP _bs3fa_sample_meanY(SEXP YplusMeanSEXP, SEXP LambdaSEXP, SEXP etaSEXP, SEXP sigsq_ySEXP, SEXP alphCovDDSEXP, SEXP obs_YSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< arma::mat >::type YplusMean(YplusMeanSEXP);
+    Rcpp::traits::input_parameter< arma::mat >::type Lambda(LambdaSEXP);
+    Rcpp::traits::input_parameter< arma::mat >::type eta(etaSEXP);
+    Rcpp::traits::input_parameter< arma::vec >::type sigsq_y(sigsq_ySEXP);
+    Rcpp::traits::input_parameter< arma::mat >::type alphCovDD(alphCovDDSEXP);
+    Rcpp::traits::input_parameter< arma::mat >::type obs_Y(obs_YSEXP);
+    rcpp_result_gen = Rcpp::wrap(sample_meanY(YplusMean, Lambda, eta, sigsq_y, alphCovDD, obs_Y));
+    return rcpp_result_gen;
+END_RCPP
+}
+// sample_psi_Ymn
+double sample_psi_Ymn(double g, arma::vec Ymean, arma::mat covDD, double nugget);
+RcppExport SEXP _bs3fa_sample_psi_Ymn(SEXP gSEXP, SEXP YmeanSEXP, SEXP covDDSEXP, SEXP nuggetSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< double >::type g(gSEXP);
+    Rcpp::traits::input_parameter< arma::vec >::type Ymean(YmeanSEXP);
+    Rcpp::traits::input_parameter< arma::mat >::type covDD(covDDSEXP);
+    Rcpp::traits::input_parameter< double >::type nugget(nuggetSEXP);
+    rcpp_result_gen = Rcpp::wrap(sample_psi_Ymn(g, Ymean, covDD, nugget));
+    return rcpp_result_gen;
+END_RCPP
+}
+// sample_meanZ
+arma::vec sample_meanZ(arma::mat ZplusMean, arma::mat Theta, arma::mat eta, arma::mat xi, arma::mat nu, arma::vec sigsq_z, arma::vec tau_Zmn);
+RcppExport SEXP _bs3fa_sample_meanZ(SEXP ZplusMeanSEXP, SEXP ThetaSEXP, SEXP etaSEXP, SEXP xiSEXP, SEXP nuSEXP, SEXP sigsq_zSEXP, SEXP tau_ZmnSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< arma::mat >::type ZplusMean(ZplusMeanSEXP);
+    Rcpp::traits::input_parameter< arma::mat >::type Theta(ThetaSEXP);
+    Rcpp::traits::input_parameter< arma::mat >::type eta(etaSEXP);
+    Rcpp::traits::input_parameter< arma::mat >::type xi(xiSEXP);
+    Rcpp::traits::input_parameter< arma::mat >::type nu(nuSEXP);
+    Rcpp::traits::input_parameter< arma::vec >::type sigsq_z(sigsq_zSEXP);
+    Rcpp::traits::input_parameter< arma::vec >::type tau_Zmn(tau_ZmnSEXP);
+    rcpp_result_gen = Rcpp::wrap(sample_meanZ(ZplusMean, Theta, eta, xi, nu, sigsq_z, tau_Zmn));
+    return rcpp_result_gen;
+END_RCPP
+}
+// sample_tau_Zmn
+arma::vec sample_tau_Zmn(arma::vec Zmean);
+RcppExport SEXP _bs3fa_sample_tau_Zmn(SEXP ZmeanSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< arma::vec >::type Zmean(ZmeanSEXP);
+    rcpp_result_gen = Rcpp::wrap(sample_tau_Zmn(Zmean));
+    return rcpp_result_gen;
+END_RCPP
+}
 // get_covDD
 arma::mat get_covDD(arma::vec d_vec, double l);
 RcppExport SEXP _bs3fa_get_covDD(SEXP d_vecSEXP, SEXP lSEXP) {
@@ -371,8 +431,8 @@ BEGIN_RCPP
 END_RCPP
 }
 // sample_Y_miss
-arma::mat sample_Y_miss(arma::mat Lambda, arma::mat eta, arma::vec sigsq_y, arma::mat Y, arma::mat obs_Y);
-RcppExport SEXP _bs3fa_sample_Y_miss(SEXP LambdaSEXP, SEXP etaSEXP, SEXP sigsq_ySEXP, SEXP YSEXP, SEXP obs_YSEXP) {
+arma::mat sample_Y_miss(arma::mat Lambda, arma::mat eta, arma::vec sigsq_y, arma::mat Y, arma::mat obs_Y, arma::vec Ymean);
+RcppExport SEXP _bs3fa_sample_Y_miss(SEXP LambdaSEXP, SEXP etaSEXP, SEXP sigsq_ySEXP, SEXP YSEXP, SEXP obs_YSEXP, SEXP YmeanSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -381,13 +441,14 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< arma::vec >::type sigsq_y(sigsq_ySEXP);
     Rcpp::traits::input_parameter< arma::mat >::type Y(YSEXP);
     Rcpp::traits::input_parameter< arma::mat >::type obs_Y(obs_YSEXP);
-    rcpp_result_gen = Rcpp::wrap(sample_Y_miss(Lambda, eta, sigsq_y, Y, obs_Y));
+    Rcpp::traits::input_parameter< arma::vec >::type Ymean(YmeanSEXP);
+    rcpp_result_gen = Rcpp::wrap(sample_Y_miss(Lambda, eta, sigsq_y, Y, obs_Y, Ymean));
     return rcpp_result_gen;
 END_RCPP
 }
 // sample_X
-Rcpp::List sample_X(std::vector< std::string > type, arma::mat X_original, arma::vec sigsq_x, arma::mat Theta, arma::mat eta, arma::mat xi, arma::mat nu);
-RcppExport SEXP _bs3fa_sample_X(SEXP typeSEXP, SEXP X_originalSEXP, SEXP sigsq_xSEXP, SEXP ThetaSEXP, SEXP etaSEXP, SEXP xiSEXP, SEXP nuSEXP) {
+Rcpp::List sample_X(std::vector< std::string > type, arma::mat X_original, arma::vec sigsq_x, arma::mat Theta, arma::mat eta, arma::mat xi, arma::mat nu, arma::vec Zmean);
+RcppExport SEXP _bs3fa_sample_X(SEXP typeSEXP, SEXP X_originalSEXP, SEXP sigsq_xSEXP, SEXP ThetaSEXP, SEXP etaSEXP, SEXP xiSEXP, SEXP nuSEXP, SEXP ZmeanSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -398,7 +459,8 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< arma::mat >::type eta(etaSEXP);
     Rcpp::traits::input_parameter< arma::mat >::type xi(xiSEXP);
     Rcpp::traits::input_parameter< arma::mat >::type nu(nuSEXP);
-    rcpp_result_gen = Rcpp::wrap(sample_X(type, X_original, sigsq_x, Theta, eta, xi, nu));
+    Rcpp::traits::input_parameter< arma::vec >::type Zmean(ZmeanSEXP);
+    rcpp_result_gen = Rcpp::wrap(sample_X(type, X_original, sigsq_x, Theta, eta, xi, nu, Zmean));
     return rcpp_result_gen;
 END_RCPP
 }
@@ -504,8 +566,8 @@ static const R_CallMethodDef CallEntries[] = {
     {"_bs3fa_sample_sigsq_x", (DL_FUNC) &_bs3fa_sample_sigsq_x, 4},
     {"_bs3fa_sample_sigsq_y", (DL_FUNC) &_bs3fa_sample_sigsq_y, 5},
     {"_bs3fa_sample_sigsq_longy", (DL_FUNC) &_bs3fa_sample_sigsq_longy, 6},
-    {"_bs3fa_get_X_min_mu", (DL_FUNC) &_bs3fa_get_X_min_mu, 5},
-    {"_bs3fa_get_Y_min_mu_long", (DL_FUNC) &_bs3fa_get_Y_min_mu_long, 5},
+    {"_bs3fa_get_X_min_mu", (DL_FUNC) &_bs3fa_get_X_min_mu, 6},
+    {"_bs3fa_get_Y_min_mu_long", (DL_FUNC) &_bs3fa_get_Y_min_mu_long, 6},
     {"_bs3fa_get_Y_min_mu", (DL_FUNC) &_bs3fa_get_Y_min_mu, 3},
     {"_bs3fa_get_tau", (DL_FUNC) &_bs3fa_get_tau, 1},
     {"_bs3fa_sample_eta_all", (DL_FUNC) &_bs3fa_sample_eta_all, 9},
@@ -518,13 +580,17 @@ static const R_CallMethodDef CallEntries[] = {
     {"_bs3fa_sample_gammasq_th", (DL_FUNC) &_bs3fa_sample_gammasq_th, 4},
     {"_bs3fa_sample_s_mat", (DL_FUNC) &_bs3fa_sample_s_mat, 1},
     {"_bs3fa_sample_t", (DL_FUNC) &_bs3fa_sample_t, 1},
+    {"_bs3fa_sample_meanY", (DL_FUNC) &_bs3fa_sample_meanY, 6},
+    {"_bs3fa_sample_psi_Ymn", (DL_FUNC) &_bs3fa_sample_psi_Ymn, 4},
+    {"_bs3fa_sample_meanZ", (DL_FUNC) &_bs3fa_sample_meanZ, 7},
+    {"_bs3fa_sample_tau_Zmn", (DL_FUNC) &_bs3fa_sample_tau_Zmn, 1},
     {"_bs3fa_get_covDD", (DL_FUNC) &_bs3fa_get_covDD, 2},
     {"_bs3fa_sample_Lambda", (DL_FUNC) &_bs3fa_sample_Lambda, 7},
     {"_bs3fa_sample_Lambda_err", (DL_FUNC) &_bs3fa_sample_Lambda_err, 7},
     {"_bs3fa_sample_psi_lam", (DL_FUNC) &_bs3fa_sample_psi_lam, 5},
     {"_bs3fa_sample_delta_ome", (DL_FUNC) &_bs3fa_sample_delta_ome, 10},
-    {"_bs3fa_sample_Y_miss", (DL_FUNC) &_bs3fa_sample_Y_miss, 5},
-    {"_bs3fa_sample_X", (DL_FUNC) &_bs3fa_sample_X, 7},
+    {"_bs3fa_sample_Y_miss", (DL_FUNC) &_bs3fa_sample_Y_miss, 6},
+    {"_bs3fa_sample_X", (DL_FUNC) &_bs3fa_sample_X, 8},
     {"_bs3fa_sample_X_init", (DL_FUNC) &_bs3fa_sample_X_init, 3},
     {"_bs3fa_get_sqexp_kernel", (DL_FUNC) &_bs3fa_get_sqexp_kernel, 4},
     {"_bs3fa_sample_eta_fpca", (DL_FUNC) &_bs3fa_sample_eta_fpca, 4},
