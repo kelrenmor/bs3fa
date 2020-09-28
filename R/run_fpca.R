@@ -104,6 +104,7 @@ run_fpca <- function(Y, K, dvec_unique=1:nrow(Y), post_process=T, Y_format='long
   Lambda_save = array(NA, dim=c(D,K,nsamps_save))
   eta_save = array(NA, dim=c(K,N,nsamps_save))
   if(homo_Y){ sigsq_y_save = rep(NA, nsamps_save) }else{ sigsq_y_save = matrix(NA, nrow=D, ncol=nsamps_save) }
+  Ymu_save = matrix(NA, nrow=D, ncol=nsamps_save)
   Y_save = array(NA, dim=c(D,N,nsamps_save))
 
   ##### Run sampler
@@ -170,6 +171,7 @@ run_fpca <- function(Y, K, dvec_unique=1:nrow(Y), post_process=T, Y_format='long
       Lambda_save[,,ind] = Lambda
       eta_save[,,ind] = eta
       if(homo_Y){ sigsq_y_save[ind] = sigsq_y_vec[1] }else{ sigsq_y_save[,ind] = sigsq_y_vec }
+      Ymu_save[,ind] = Ymean
       Y_save[,,ind] = sample_Y_miss(Lambda, eta, sigsq_y_vec, Y, obs_Y, Ymean)
       ind = ind + 1
     }
@@ -200,11 +202,11 @@ run_fpca <- function(Y, K, dvec_unique=1:nrow(Y), post_process=T, Y_format='long
   
   ##### Get out predicted mean for Y
   Y_mean = matrix(0, nrow=dim(Lambda_save)[1], ncol=dim(eta_save)[2])
-  for(i in 1:nsamps_save){ Y_mean = Y_mean + Lambda_save[,,i] %*% eta_save[,,i] }
-  Y_mean = Y_mean/(nsamps_save)
+  for(i in 1:nsamps_save){ Y_mean = Y_mean + Lambda_save[,,i] %*% eta_save[,,i] + Ymu_save[,i] }
+  Y_mean = Y_mean / nsamps_save
   
   ##### Save everything in a list and return said list.
-  res = list("Lambda_save"=Lambda_save, "eta_save"=eta_save, 
+  res = list("Lambda_save"=Lambda_save, "eta_save"=eta_save, "Ymu_save"=Ymu_save,
              "sigsq_y_save"=sigsq_y_save, "Y_save"=Y_save, "dvec_unique"=dvec_unique, 
              "dvec_unique_original"=dvec_unique_original, "Y_mean"=Y_mean, "Lambda_mean"=Lambda_mean, "eta_mean"=eta_mean,
              "l"=l, "covDD"=covDD, "Y"=Y, "norm_rescale"=norm_rescale, "D"=D, "K"=K)
