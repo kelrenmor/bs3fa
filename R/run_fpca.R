@@ -1,5 +1,5 @@
-run_fpca <- function(Y, K, dvec_unique=1:nrow(Y), post_process=T, Y_format='long',
-                     nsamps_save=500, thin=10, burnin=5000, print_progress=T){
+run_fpca <- function(Y, K, dvec_unique=1:nrow(Y), post_process=TRUE, Y_format='long',
+                     nsamps_save=500, thin=10, burnin=5000, print_progress=TRUE){
   
   # Y - D x N dose response curve matrix, where S is the number of doses and N is the no of obs.
   #     (if Y provided in this format, and no explicit labels are included in Y, col alignment assumed)
@@ -26,6 +26,7 @@ run_fpca <- function(Y, K, dvec_unique=1:nrow(Y), post_process=T, Y_format='long
   nugget=1e-8 # Add for numerical stability in inversion of CovDD.
   homo_Y=T # Set to T for homoscedastic variance (only option for now), F for hetero.
   a_sig_y=1; b_sig_y=1
+  if( ! ( (cred_band=="pointwise") | (cred_band=="simultaneous") ) ){ stop('cred_band must be one of "pointwise" or "simultaneous"') }
   
   ##### Do preliminary data manipulation and normalization
   if( Y_format=='wide' ){ # Then number of obs per chemical/dose combo is 1 (when observed).

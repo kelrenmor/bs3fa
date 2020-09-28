@@ -1,7 +1,8 @@
-run_bs3fa <- function(X, Y, K, J, X_type=rep("continuous", nrow(X)), post_process=T,
+run_bs3fa <- function(X, Y, K, J, X_type=rep("continuous", nrow(X)), alpha=0.05, 
+                      cred_band="simultaneous", get_pValBand=FALSE, post_process=TRUE,
                       dvec_unique=if(ncol(X)==ncol(Y)) 1:nrow(Y) else sort(unique(Y[,2])),
                       nsamps_save=500, thin=10, burnin=5000, 
-                      print_progress=T, save_original_data=F)
+                      print_progress=TRUE, save_original_data=FALSE)
 {
   # X - S x N chemical feature matrix, where S is the number of features and N is the no of obs.
   #     If Y is provided in 'long' format colnames(X) must give IDs used for Y.
@@ -11,6 +12,9 @@ run_bs3fa <- function(X, Y, K, J, X_type=rep("continuous", nrow(X)), post_proces
   #     Alternatively, T x 3 matrix where column 1 is ID (must also be provided in first row of X), 
   #     column 2 is dose, and column 3 is response. 
   # X_type - length-S vector giving 'type' of each variable in X ("continuous", "binary", "count" supported).
+  # alpha - return the interval over which the integral of the posterior probability distribution sums to 1 - alpha.
+  # cred_band - one of "pointwise" or "simultaneous", the latter based on Crainiceanu et al. (2007).
+  # get_pValBand - whether to compute global Bayesian p-val of simultaneous band scores from Meyer et al. (2015, Biometrics).
   # dvec_unique - 1:D by default, else vector or D x 1 matrix of doses corresponding to rows of Y.
   # K - The maximum dimension for the common latent space.
   # J - The maximum dimension for the feature-specific latent space.
@@ -42,6 +46,7 @@ run_bs3fa <- function(X, Y, K, J, X_type=rep("continuous", nrow(X)), post_proces
   types = unique(X_type)
   cond = (sum(sapply(types, function(x) !(x %in% c("continuous","binary","count"))))==0)
   if( !cond ){ stop('X_type must be length-S vector containing only {"continuous","binary","count"}') }
+  if( ! ( (cred_band=="pointwise") | (cred_band=="simultaneous") ) ){ stop('cred_band must be one of "pointwise" or "simultaneous"') }
   
   ##### Do preliminary data manipulation and normalization
   N = ncol(X); N1 = ncol(Y)
@@ -363,10 +368,32 @@ run_bs3fa <- function(X, Y, K, J, X_type=rep("continuous", nrow(X)), post_proces
   
   ##### Get out predicted mean and 95% credible interval for Y (on original scale if specified)
   Y_mean = apply(DRcurve_save,c(1,2),mean)
-  Y_ll = apply(Y_save,c(1,2),function(x) quantile(x, 0.025))
-  Y_ul = apply(Y_save,c(1,2),function(x) quantile(x, 0.975))
-  DR_ll = apply(DRcurve_save,c(1,2),function(x) quantile(x, 0.025))
-  DR_ul = apply(DRcurve_save,c(1,2),function(x) quantile(x, 0.975))
+  if(cred_band=="simultaneous"){
+    Y_ll = Y_ul = DR_ll = DR_ul = matrix(NA, nrow=D, ncol=N)
+    for(ii in 1:N){
+      credBandsY = get_credBands(sampFuns=t(Y_save[,ii,]), alpha=alpha)
+      Y_ll[,ii] = credBandsY[,1]
+      Y_ul[,ii] = credBandsY[,2]
+      credBandsDR = get_credBands(sampFuns=t(DRcurve_save[,ii,]), alpha=alpha)
+      DR_ll[,ii] = credBandsDR[,1]
+      DR_ul[,ii] = credBandsDR[,2]
+    }
+  } else{
+    Y_ll = apply(Y_save,c(1,2),function(x) quantile(x, alpha/2))
+    Y_ul = apply(Y_save,c(1,2),function(x) quantile(x, 1-alpha/2))
+    DR_ll = apply(DRcurve_save,c(1,2),function(x) quantile(x, alpha/2))
+    DR_ul = apply(DRcurve_save,c(1,2),function(x) quantile(x, 1-alpha/2))
+  }
+  
+  if(get_pValBand){
+    GBpV_Y = GBpV_DR = rep(NA, N)
+    for(ii in 1:N){
+      GBpV_Y[ii] = min( get_simBaSc(sampFuns=t(Y_save[,ii,])) )
+      GBpV_DR[ii] = min( get_simBaSc(sampFuns=t(DRcurve_save[,ii,])) )
+    }
+  } else{
+    GBpV_Y = GBpV_DR = NULL
+  }
   
   ##### Save everything in a list and return said list.
   res = list("Theta_save"=Theta_save, "Lambda_save"=Lambda_save, "eta_save"=eta_save, 
@@ -379,11 +406,13 @@ run_bs3fa <- function(X, Y, K, J, X_type=rep("continuous", nrow(X)), post_proces
              "DRcurve_mean"=Y_mean, "DR_ll"=DR_ll, "DR_ul"=DR_ul,
              "Y_mean"=Y_mean, "Y_ll"=Y_ll, "Y_ul"=Y_ul, 
              "Lambda_mean"=Lambda_mean, "Theta_mean"=Theta_mean, "eta_mean"=eta_mean, 
-             "Xi_mean"=Xi_mean, "nu_mean"=nu_mean)
+             "Xi_mean"=Xi_mean, "nu_mean"=nu_mean,
              # (ABOVE) Summary stats for parameters
+             "GBpV_Y"=GBpV_Y, "GBpV_DR"=GBpV_DR)
+             # (ABOVE) Global Bayesian p-values for whether DR curve and Y are zero everywhere.
   if(save_original_data){ # Input data (save to output for reference)
-    res_dat = list("dvec_unique"=dvec_unique_original, "l"=l, "covDD"=covDD, 
-                   "Y"=Y, "X"=X, "not_cont_X_vars"=not_cont,
+    res_dat = list("dvec_unique"=dvec_unique_original, "alpha"=alpha, "l"=l, "covDD"=covDD, 
+                   "Y"=Y, "X"=X, "not_cont_X_vars"=not_cont, "cred_band"=cred_band, "get_pValBand"=get_pValBand, 
                    "kept_X_vars_original"=cond, "S"=S, "D"=D, "K"=K, "J"=J)
     res = c(res, res_dat)
   }
