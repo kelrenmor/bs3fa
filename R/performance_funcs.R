@@ -78,7 +78,8 @@ get_sign = function(eta_true, eta){
 }
 
 # Function to match up eta, Lambda, and Theta to their true indices
-reorder_entries = function(eta_true, eta, Lambda_true, Lambda, Theta_true, Theta, is_bsssfa=T){
+reorder_entries = function(eta_true, eta, Lambda_true, Lambda, Theta_true, Theta, 
+                           is_bsssfa=T, alpha=0.05, cred_band="simultaneous"){
   # Figure out the correlation between pairwise correlations of eta_true and eta
   K_tru = nrow(eta_true)
   K_mod = nrow(eta)
@@ -103,14 +104,26 @@ reorder_entries = function(eta_true, eta, Lambda_true, Lambda, Theta_true, Theta
       eta_tmp[k_mod,] = apply(eta[k_mod,,],1,mean)
       Lambda_tmp[,k_mod] = apply(Lambda[,k_mod,],1,mean)
       Theta_tmp[,k_mod] = apply(Theta[,k_mod,],1,mean)
-      # Get lower 2.5% of 95% credible interval
-      eta_low[k_mod,] = apply(eta[k_mod,,],1,function(x) unname(quantile(x,0.025)))
-      Lambda_low[,k_mod] = apply(Lambda[,k_mod,],1,function(x) unname(quantile(x,0.025)))
-      Theta_low[,k_mod] = apply(Theta[,k_mod,],1,function(x) unname(quantile(x,0.025)))
-      # Get upper 97.5% of 95% credible interval
-      eta_upp[k_mod,] = apply(eta[k_mod,,],1,function(x) unname(quantile(x,0.975)))
-      Lambda_upp[,k_mod] = apply(Lambda[,k_mod,],1,function(x) unname(quantile(x,0.975)))
-      Theta_upp[,k_mod] = apply(Theta[,k_mod,],1,function(x) unname(quantile(x,0.975)))
+      if(cred_band=="simultaneous"){
+        credBands_eta = get_credBands(sampFuns=t(eta[k_mod,,]), alpha=alpha)
+        credBands_Lam = get_credBands(sampFuns=t(Lambda[,k_mod,]), alpha=alpha)
+        credBands_The = get_credBands(sampFuns=t(Theta[,k_mod,]), alpha=alpha)
+        eta_low[k_mod,] = credBands_eta[,1]
+        eta_upp[k_mod,] = credBands_eta[,2]
+        Lambda_low[,k_mod] = credBands_Lam[,1]
+        Lambda_upp[,k_mod] = credBands_Lam[,2]
+        Theta_low[,k_mod] = credBands_The[,1]
+        Theta_upp[,k_mod] = credBands_The[,2]
+      } else{ # cred_band="pointwise"
+        # Get lower 2.5% of 95% credible interval
+        eta_low[k_mod,] = apply(eta[k_mod,,],1,function(x) unname(quantile(x,alpha/2)))
+        Lambda_low[,k_mod] = apply(Lambda[,k_mod,],1,function(x) unname(quantile(x,alpha/2)))
+        Theta_low[,k_mod] = apply(Theta[,k_mod,],1,function(x) unname(quantile(x,alpha/2)))
+        # Get upper 97.5% of 95% credible interval
+        eta_upp[k_mod,] = apply(eta[k_mod,,],1,function(x) unname(quantile(x,1-alpha/2)))
+        Lambda_upp[,k_mod] = apply(Lambda[,k_mod,],1,function(x) unname(quantile(x,1-alpha/2)))
+        Theta_upp[,k_mod] = apply(Theta[,k_mod,],1,function(x) unname(quantile(x,1-alpha/2)))
+      }
     }
     eta = eta_tmp; Lambda = Lambda_tmp; Theta = Theta_tmp
   } else{eta_low=eta_upp=Lambda_low=Lambda_upp=Theta_low=Theta_upp=NULL}
@@ -152,7 +165,7 @@ reorder_entries = function(eta_true, eta, Lambda_true, Lambda, Theta_true, Theta
   return(res)
 }
 
-pred_drcurve <- function(Lambda_mod, eta_mod, rescale=1){
+pred_drcurve <- function(Lambda_mod, eta_mod, rescale=1, alpha=0.05, cred_band="simultaneous"){
   nsims = dim(Lambda_mod)[3]
   D = dim(Lambda_mod)[1]
   N = dim(eta_mod)[2]
@@ -165,8 +178,14 @@ pred_drcurve <- function(Lambda_mod, eta_mod, rescale=1){
   for(i in 1:N){
     # Get mean and lower 2.5% and upper 97.5% of 95% credible interval
     dr_est[,i] = apply(dr_mod[,i,],1,mean)
-    dr_low[,i] = apply(dr_mod[,i,],1,function(x) unname(quantile(x,0.025)))
-    dr_upp[,i] = apply(dr_mod[,i,],1,function(x) unname(quantile(x,0.975)))
+    if(cred_band=="simultaneous"){
+      credBands = get_credBands(sampFuns=t(dr_mod[,i,]), alpha=alpha)
+      dr_low[,i] = credBandsY[,1]
+      dr_upp[,i] = credBandsY[,2]
+    } else{ # cred_band="pointwise"
+      dr_low[,i] = apply(dr_mod[,i,],1,function(x) unname(quantile(x,alpha/2)))
+      dr_upp[,i] = apply(dr_mod[,i,],1,function(x) unname(quantile(x,1-alpha/2)))
+    }
   }
   dr_list = list("dr_est"=dr_est, "dr_low"=dr_low, "dr_upp"=dr_upp)
   return(dr_list)

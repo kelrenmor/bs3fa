@@ -13,7 +13,7 @@
 # for vectors. The resulting credible intervals will provide joint coverage at the (1-alpha)%
 # level across all components of the vector.
 #
-.get_credBands = function(sampFuns, alpha = .05){
+get_credBands = function(sampFuns, alpha = .05){
   
   N = nrow(sampFuns); m = ncol(sampFuns)
   
@@ -52,7 +52,7 @@
 # over the domain \code{t} is the Global Bayesian P-Value (GBPV) for testing
 # whether the function is zero everywhere.
 #
-.get_simBaSc = function(sampFuns){
+get_simBaSc = function(sampFuns){
   
   N = nrow(sampFuns); m = ncol(sampFuns)
   
