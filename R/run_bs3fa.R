@@ -416,6 +416,18 @@ run_bs3fa <- function(X, Y, K, J, X_type=rep("continuous", nrow(X)), alpha=0.05,
     GBpV_Y = GBpV_DR = NULL
   }
   
+  # Rescale returned Z samples/mean to be consistent with data scaling
+  for(s in 1:nrow(X)){ 
+    if( !(X_type[s] == "binary") ){ 
+      tmp_cen = X_return_info[[s]][['center']]
+      tmp_scl = X_return_info[[s]][['scale']]
+      Zmu_save[s,] = Zmu_save[s,] * tmp_scl + tmp_cen
+      if( !(X_type[s] == "continous") ){
+        X_save[s,,] = X_save[s,,] * tmp_scl + tmp_cen
+      }
+    }
+  }
+
   ##### Save everything in a list and return said list.
   res = list("Theta_save"=Theta_save, "Lambda_save"=Lambda_save, "eta_save"=eta_save, 
              "Xi_save" = xi_save, "nu_save" = nu_save, 
