@@ -91,21 +91,42 @@ run_bs3fa <- function(X, Y, K, J, X_type=rep("continuous", nrow(X)), alpha=0.05,
   # Scale dvec_unique to be between 0 and 1 if not already so
   dvec_unique_original=dvec_unique
   dvec_unique=(dvec_unique-min(dvec_unique))/(max(dvec_unique)-min(dvec_unique))
-  # Scale columns of X to have unit variance and 0 mean for continuous variables
-  if( scale_X ){
-    scaled_X = t(scale(t(X)))
-    X[X_type=="continuous", ] = scaled_X[X_type=="continuous", ]
-  }
   # Get number of unique values by row (so S total) for X
   num_un = apply(X, 1, function(vec) length(unique(vec)))
-  # Automatically make X binary (0/1) if only two values
+  # Reset some variables to be binary or count
+  X_return_info = list()
   for(s in 1:nrow(X)){
-    if( num_un[s]==2 ){
+    X_return_info[[s]] = list()
+    if( num_un[s]==2 ){ # Automatically make X binary (0/1) if only two values
       un_vals = unique(X[s,])
       if( !( (sum(un_vals == c(0,1))==2) | (sum(un_vals == c(1,0))==2) ) ){
         X[s,] = 1*(X[s,] == un_vals[1]) # recode as 0/1
       }
       X_type[s] = "binary"
+      X_return_info[[s]][['vals_unq']] = un_vals
+      X_return_info[[s]][['vals_bin']] = c(1,0)
+    } else if( num_un[s]>20  ){ # Automatically treat X as continuous if more than twenty values
+      X_type[s] = "continuous"
+    }
+    if( X_type[s] == "count" ){ # Make sure no negative values (i.e., smallest value should be 0)
+      tmp_minX = min(X[s,])
+      X[s,] = X[s,] - tmp_minX
+      X_return_info[[s]][['center']] = tmp_minX
+      X_return_info[[s]][['scale']] = 1
+    }
+    X_return_info[[s]][['type']] = X_type[s]
+  }
+  # Scale columns of X to have unit variance and 0 mean for continuous variables
+  if( scale_X ){
+    scaled_X = t(scale(t(X)))
+    X[X_type=="continuous", ] = scaled_X[X_type=="continuous", ]
+    cen_tmp = attr(scaled_X,"scaled:center")
+    scl_tmp = attr(scaled_X,"scaled:scale")
+    for(s in 1:nrow(X)){
+      if( X_type[s]=="continuous" ){
+        X_return_info[[s]][['center']] = cen_tmp[s]
+        X_return_info[[s]][['scale']] = scl_tmp[s]
+      }
     }
   }
   cond = !(num_un==1)
@@ -400,7 +421,7 @@ run_bs3fa <- function(X, Y, K, J, X_type=rep("continuous", nrow(X)), alpha=0.05,
              "Xi_save" = xi_save, "nu_save" = nu_save, 
              "l_save" = l_save, "tau_save" = tau_save, "tauxi_save" = tauxi_save,
              "sigsq_y_save"=sigsq_y_save, "sigsq_x_save"=sigsq_x_save,
-             "DRcurve_save"=DRcurve_save, "Y_save"=Y_save, "Z"=X_save, 
+             "DRcurve_save"=DRcurve_save, "Y_save"=Y_save, "Z"=X_save, "X_return_info"=X_return_info,
              "Ymu_save"=Ymu_save, "Zmu_save"=Zmu_save,
              # (ABOVE) All saves for parameters
              "DRcurve_mean"=Y_mean, "DR_ll"=DR_ll, "DR_ul"=DR_ul,
