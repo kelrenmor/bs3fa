@@ -207,10 +207,10 @@ run_bs3fa <- function(X, Y, K, J, X_type=rep("continuous", nrow(X)), alpha=0.05,
   ##### Run sampler
   ind=1 # Starting index for saving values.
   bad_samps=0 # Number of samples for which cov matrix is not symmetric PD
-  inf_samps=0 # Number of samples for which the non-continuous X samps come up inf
   nsamps = nsamps_save*thin + burnin # Total number of times to loop through sampler.
-  update_samps = seq(1, nsamps, round(nsamps/20))
+  update_samps = seq(1, nsamps, round(nsamps/20))[-1]
   psi_lam_min = Inf # Initialize to infinity so anything is smaller.
+  ptm <- proc.time()
   for(ss in 1:nsamps){
     if( print_progress & ss%in%update_samps ){
       print(paste(sep="",round(100*ss/nsamps),"% done sampling"))
@@ -307,6 +307,16 @@ run_bs3fa <- function(X, Y, K, J, X_type=rep("continuous", nrow(X)), alpha=0.05,
     # Error terms for X
     X_min_mu = get_X_min_mu(Z, Theta, eta, xi, nu, Zmean)
     sigsq_x_vec = sample_sigsq_x(a_sig_x, b_sig_x, X_min_mu, X_type)
+    
+    # Print timing info
+    if(ss==1){ 
+      ptm2 <- proc.time() - ptm
+      print(paste0('Collecting ',nsamps,' samples is expected to take around ',round( nsamps*ptm2[3] / (60*60), 4),' hours,',
+                   ' (i.e., ',round( nsamps*ptm2[3] / 60, 4),' minutes)'))
+      if(print_progress){
+        print("0% done sampling")
+      }
+    }
     
     ##### Save samples #####
     if( ss>burnin & ss%%thin==0 ){
