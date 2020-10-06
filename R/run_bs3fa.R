@@ -44,8 +44,8 @@ run_bs3fa <- function(X, Y, K, J, X_type=rep("continuous", nrow(X)), alpha=0.05,
   
   ##### Do some checks:
   types = unique(X_type)
-  cond = (sum(sapply(types, function(x) !(x %in% c("continuous","binary","count"))))==0)
-  if( !cond ){ stop('X_type must be length-S vector containing only {"continuous","binary","count"}') }
+  condType = (sum(sapply(types, function(x) !(x %in% c("continuous","binary","count"))))==0)
+  if( !condType ){ stop('X_type must be length-S vector containing only {"continuous","binary","count"}') }
   if( ! ( (cred_band=="pointwise") | (cred_band=="simultaneous") ) ){ stop('cred_band must be one of "pointwise" or "simultaneous"') }
   
   ##### Do preliminary data manipulation and normalization
@@ -116,6 +116,14 @@ run_bs3fa <- function(X, Y, K, J, X_type=rep("continuous", nrow(X)), alpha=0.05,
     }
     X_return_info[[s]][['type']] = X_type[s]
   }
+  # Get rid of variables in X having no variability (or near-perfect correlation).
+  cond = !(num_un==1)
+  cond[ get_perfectCorInds(t(X)) ] = FALSE
+  X = X[cond,]
+  if(sum(cond)==1){ X=matrix(X,nrow=1) }
+  X_type = X_type[cond]
+  S = nrow(X) # Now save row dimension of X (i.e., no of features)
+  if( sum(!cond) > 0 ){print(paste(sum(!cond),"X variables have no variation, removed."))}
   # Scale columns of X to have unit variance and 0 mean for continuous variables
   if( scale_X ){
     scaled_X = t(scale(t(X)))
@@ -129,12 +137,6 @@ run_bs3fa <- function(X, Y, K, J, X_type=rep("continuous", nrow(X)), alpha=0.05,
       }
     }
   }
-  cond = !(num_un==1)
-  X = X[cond,]
-  if(sum(cond)==1){ X=matrix(X,nrow=1) }
-  X_type = X_type[cond]
-  S = nrow(X) # Now save row dimension of X (i.e., no of features)
-  if( sum(!cond) > 0 ){print(paste(sum(!cond),"X variables have no variation, removed."))}
   not_cont = !(X_type=="continuous")
   # Normalize data by Frobenius norm (make Y on same relative scale as X)
   if(fr_normalize){
@@ -456,7 +458,7 @@ run_bs3fa <- function(X, Y, K, J, X_type=rep("continuous", nrow(X)), alpha=0.05,
   if(save_original_data){ # Input data (save to output for reference)
     res_dat = list("dvec_unique"=dvec_unique_original, "alpha"=alpha, "l"=l, "covDD"=covDD, 
                    "Y"=Y, "X"=X, "not_cont_X_vars"=not_cont, "cred_band"=cred_band, "get_pValBand"=get_pValBand, 
-                   "kept_X_vars_original"=cond, "S"=S, "D"=D, "K"=K, "J"=J)
+                   "kept_X_vars_original"=which(cond), "S"=S, "D"=D, "K"=K, "J"=J)
     res = c(res, res_dat)
   }
   return(res)
