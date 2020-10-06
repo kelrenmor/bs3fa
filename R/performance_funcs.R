@@ -180,8 +180,8 @@ pred_drcurve <- function(Lambda_mod, eta_mod, rescale=1, alpha=0.05, cred_band="
     dr_est[,i] = apply(dr_mod[,i,],1,mean)
     if(cred_band=="simultaneous"){
       credBands = get_credBands(sampFuns=t(dr_mod[,i,]), alpha=alpha)
-      dr_low[,i] = credBandsY[,1]
-      dr_upp[,i] = credBandsY[,2]
+      dr_low[,i] = credBands[,1]
+      dr_upp[,i] = credBands[,2]
     } else{ # cred_band="pointwise"
       dr_low[,i] = apply(dr_mod[,i,],1,function(x) unname(quantile(x,alpha/2)))
       dr_upp[,i] = apply(dr_mod[,i,],1,function(x) unname(quantile(x,1-alpha/2)))

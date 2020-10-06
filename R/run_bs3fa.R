@@ -118,12 +118,13 @@ run_bs3fa <- function(X, Y, K, J, X_type=rep("continuous", nrow(X)), alpha=0.05,
   }
   # Get rid of variables in X having no variability (or near-perfect correlation).
   cond = !(num_un==1)
-  cond[ get_perfectCorInds(t(X)) ] = FALSE
+  tmpInds = get_perfectCorInds(t(X))
+  if( !(tmpInds=="none") ){ cond[ tmpInds ] = FALSE }
   X = X[cond,]
   if(sum(cond)==1){ X=matrix(X,nrow=1) }
   X_type = X_type[cond]
   S = nrow(X) # Now save row dimension of X (i.e., no of features)
-  if( sum(!cond) > 0 ){print(paste(sum(!cond),"X variables have no variation, removed."))}
+  if( sum(!cond) > 0 ){print(paste(sum(!cond),"X variable(s) have no (additional) information, removed."))}
   # Scale columns of X to have unit variance and 0 mean for continuous variables
   if( scale_X ){
     scaled_X = t(scale(t(X)))
