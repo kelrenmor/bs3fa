@@ -346,7 +346,7 @@ run_bs3fa <- function(X, Y, K, J, X_type=rep("continuous", nrow(X)), alpha=0.05,
   # Reset the Y-specific things back to their original scales!
   Lambda_save = Lambda_save / ifelse(return_original_scale,norm_rescale,1)
   sigsq_y_save = sigsq_y_save / ifelse(return_original_scale,norm_rescale^2,1)
-  Ymu_save = Ymu_save / ifelse(return_original_scale,norm_rescale^2,1)
+  Ymu_save = Ymu_save / ifelse(return_original_scale,norm_rescale,1)
   Y_save = Y_save / ifelse(return_original_scale,norm_rescale,1)
   DRcurve_save = DRcurve_save / ifelse(return_original_scale,norm_rescale,1)
   
