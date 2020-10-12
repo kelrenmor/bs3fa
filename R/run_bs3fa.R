@@ -163,7 +163,8 @@ run_bs3fa <- function(X, Y, K, J, X_type=rep("continuous", nrow(X)), alpha=0.05,
   init_list = sampler_init(random_init, N, D, S, K, J, X_type, X)
   list2env(init_list, environment()) # puts list elements in environment
   g_xi = g_psi = 1; l_init=D*0.0008;
-  covDD = covDD_Ymn = get_covDD(matrix(dvec_unique), l_init)
+  covDD = get_covDD(matrix(dvec_unique), l_init)
+  covDD_Ymn = get_covDD(matrix(dvec_unique), D*0.008)
   
   # Set up framework to sample the length-scale, if user sets num_ls_opts > 1
   if(num_ls_opts>1){
