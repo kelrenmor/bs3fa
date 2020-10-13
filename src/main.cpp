@@ -212,11 +212,11 @@ arma::vec get_tau(arma::vec delta) {
 arma::mat sample_eta_all(arma::mat Y, arma::mat X, arma::mat xi, arma::mat nu, arma::mat Lambda, 
                          arma::mat Theta, arma::vec sigsq_y, arma::vec sigsq_x, arma::mat obs_Y) {
   /* A draw of the K x N matrix [\eta_1,...,\eta_N], the joint scores associated with both X and Y.
-  * Here D = [Y; X - \xi \nu] is (D+S) x N vector (cols are obs-specific),
-  * Omega = [\Lambda; \Theta] is (D+S) x K matrix (common across obs),
-  * and sigsq_D_inv is (D+S) x 1 vector of inv diag entries of independent noise cov matrix for D.
-  * 
-  */ 
+   * Here D = [Y; X - \xi \nu] is (D+S) x N vector (cols are obs-specific),
+   * Omega = [\Lambda; \Theta] is (D+S) x K matrix (common across obs),
+   * and sigsq_D_inv is (D+S) x 1 vector of inv diag entries of independent noise cov matrix for D.
+   * 
+   */ 
   arma::mat Omega = join_cols(Lambda, Theta); // (D + S) x K
   arma::mat Omega_t = Omega.t(); // K x (D + S)
   arma::mat D = join_cols(Y, X - xi*nu); // (D + S) x N
@@ -1267,3 +1267,4 @@ arma::vec sample_delta_lam(double a1, double a2, arma::vec delta_ome,
   
   return delta_ome;
 }
+
