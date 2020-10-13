@@ -1068,7 +1068,7 @@ arma::mat sample_X(std::vector< std::string > type, arma::mat X_original, arma::
           }
         } else{ // If variable s is count.
           if( Xsi_original==0 ){
-            X_samp(i) = r_truncnorm(E_Xs[i], sig_xs, -50, 0);
+            X_samp(i) = r_truncnorm(E_Xs[i], sig_xs, -15, 0);
           } else{
             X_samp(i) = r_truncnorm(E_Xs[i], sig_xs, Xsi_original-1, Xsi_original);
           }
