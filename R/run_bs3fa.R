@@ -265,34 +265,11 @@ run_bs3fa <- function(X, Y, K, J, X_type=rep("continuous", nrow(X)), alpha=0.05,
     
     ##### Sample latent variable Z corresponding to non-continuous X, and mean of Z  #####
     
-    # Z sample, using rescaled Theta and xi
-    Theta_scaled = Theta; xi_scaled = xi; sigsq_x_vec_scaled = sigsq_x_vec
-    if(ss==1){tmp_scl_vec = rep(1, nrow(Theta))}
-    for(jj in 1:nrow(Theta)){
-      if( !(X_type[jj]=='continuous') ){
-        Theta_scaled[jj,] = Theta[jj,] * tmp_scl_vec[jj]
-        xi_scaled[jj,] = xi[jj,] * tmp_scl_vec[jj]
-        sigsq_x_vec_scaled[jj] = sigsq_x_vec[jj] * (tmp_scl_vec[jj])^2
-      }
-    }
-    Z = sample_X(X_type, X, sigsq_x_vec_scaled, Theta_scaled, eta, xi_scaled, nu, Zmean)
+    # Z sample
+    Z = sample_X(X_type, X, sigsq_x_vec, Theta, eta, xi, nu, Zmean)
     # Mean of Z and mean-centered Z
     Zmean = sample_meanZ(Z, Theta, eta, xi, nu, sigsq_x_vec, tau_Zmn)
     Zcentered = sweep(Z, 1, Zmean) # Z - Zmean
-    # Rescale for purposes of modeling
-    tmp_scl_vec = rep(NA, nrow(Z))
-    for(jj in 1:nrow(Z)){
-      if( !(X_type[jj]=='continuous') ){
-        tmp = scale(Zcentered[jj,], center=F, scale=T)
-        tmp_scl = attr(tmp,"scaled:scale")
-        Zcentered[jj,] = c(tmp)
-        Theta[jj,] = Theta[jj,] / tmp_scl
-        gammasq_th[jj,] = gammasq_th[jj,] / (tmp_scl^2)
-        xi[jj,] = xi[jj,] / tmp_scl
-        phi_xi[jj,] = phi_xi[jj,] * (tmp_scl^2)
-        tmp_scl_vec[jj] = tmp_scl
-      }
-    }
     # Precision term for the mean of Z
     tau_Zmn = sample_tau_Zmn(Zmean)
     
@@ -334,7 +311,7 @@ run_bs3fa <- function(X, Y, K, J, X_type=rep("continuous", nrow(X)), alpha=0.05,
     }
     
     # Error terms for X
-    X_min_mu = get_X_min_mu(Zcentered, Theta, eta, xi, nu, zeroSvec)
+    X_min_mu = get_X_min_mu(Z, Theta, eta, xi, nu, Zmean)
     sigsq_x_vec = sample_sigsq_x(a_sig_x, b_sig_x, X_min_mu, X_type)
     
     # Print timing info
@@ -349,13 +326,13 @@ run_bs3fa <- function(X, Y, K, J, X_type=rep("continuous", nrow(X)), alpha=0.05,
     
     ##### Save samples #####
     if( ss>burnin & ss%%thin==0 ){
-      Theta_save[,,ind] = Theta_scaled
+      Theta_save[,,ind] = Theta
       Lambda_save[,,ind] = Lambda
       eta_save[,,ind] = eta
-      xi_save[,,ind] = xi_scaled
+      xi_save[,,ind] = xi
       nu_save[,,ind] = nu
       if(homo_Y){ sigsq_y_save[ind] = sigsq_y_vec[1] }else{ sigsq_y_save[,ind] = sigsq_y_vec }
-      sigsq_x_save[,ind] = sigsq_x_vec_scaled
+      sigsq_x_save[,ind] = sigsq_x_vec
       Ymu_save[,ind] = Ymean
       Zmu_save[,ind] = Zmean
       Y_save[,,ind] = sample_Y_miss(Lambda, eta, sigsq_y_vec, Y, all_nobs_mat, Ymean)
