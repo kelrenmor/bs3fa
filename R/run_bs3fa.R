@@ -203,6 +203,7 @@ run_bs3fa <- function(X, Y, K, J, X_type=rep("continuous", nrow(X)), alpha=0.05,
   sigsq_x_save = matrix(NA, nrow=S, ncol=nsamps_save)
   Ymu_save = matrix(NA, nrow=D, ncol=nsamps_save)
   Zmu_save = matrix(NA, nrow=S, ncol=nsamps_save)
+  Zmean_save = array(NA, dim=c(S,N,nsamps_save))
   Y_save = DRcurve_save = array(NA, dim=c(D,N,nsamps_save))
   X_save = array(NA, dim=c(S,N,nsamps_save))
   if(num_ls_opts>1){l_save = rep(NA, nsamps_save)}else{l_save=NULL}
@@ -405,21 +406,24 @@ run_bs3fa <- function(X, Y, K, J, X_type=rep("continuous", nrow(X)), alpha=0.05,
   
   ##### Get out predicted mean and 95% credible interval for Y (on original scale if specified)
   Y_mean = apply(DRcurve_save,c(1,2),mean)
+  cred_func_dat = function(samps, alpha){ 
+    return( t(apply( samps, 1, function(x) quantile(x, c(alpha/2, 1-alpha/2)) )) )
+  }
   if(cred_band=="simultaneous"){
-    Y_ll = Y_ul = DR_ll = DR_ul = matrix(NA, nrow=D, ncol=N)
-    for(ii in 1:N){
-      credBandsY = get_credBands(sampFuns=t(Y_save[,ii,]), alpha=alpha)
-      Y_ll[,ii] = credBandsY[,1]
-      Y_ul[,ii] = credBandsY[,2]
-      credBandsDR = get_credBands(sampFuns=t(DRcurve_save[,ii,]), alpha=alpha)
-      DR_ll[,ii] = credBandsDR[,1]
-      DR_ul[,ii] = credBandsDR[,2]
+    cred_func_dr = function(samps, alpha){ 
+      return( get_credBands(sampFuns=t(samps), alpha=alpha) )
     }
   } else{
-    Y_ll = apply(Y_save,c(1,2),function(x) quantile(x, alpha/2))
-    Y_ul = apply(Y_save,c(1,2),function(x) quantile(x, 1-alpha/2))
-    DR_ll = apply(DRcurve_save,c(1,2),function(x) quantile(x, alpha/2))
-    DR_ul = apply(DRcurve_save,c(1,2),function(x) quantile(x, 1-alpha/2))
+    cred_func_dr = cred_func_dat
+  }
+  Y_ll = Y_ul = DR_ll = DR_ul = matrix(NA, nrow=D, ncol=N)
+  for(ii in 1:N){
+    credBandsY = cred_func_dat(samps=Y_save[,ii,], alpha=alpha)
+    Y_ll[,ii] = credBandsY[,1]
+    Y_ul[,ii] = credBandsY[,2]
+    credBandsDR = cred_func_dr(samps=DRcurve_save[,ii,], alpha=alpha)
+    DR_ll[,ii] = credBandsDR[,1]
+    DR_ul[,ii] = credBandsDR[,2]
   }
   
   if(get_pValBand){
@@ -455,7 +459,7 @@ run_bs3fa <- function(X, Y, K, J, X_type=rep("continuous", nrow(X)), alpha=0.05,
              "DRcurve_mean"=Y_mean, "DR_ll"=DR_ll, "DR_ul"=DR_ul,
              "Y_mean"=Y_mean, "Y_ll"=Y_ll, "Y_ul"=Y_ul, 
              "Lambda_mean"=Lambda_mean, "Theta_mean"=Theta_mean, "eta_mean"=eta_mean, 
-             "Xi_mean"=Xi_mean, "nu_mean"=nu_mean,
+             "Xi_mean"=Xi_mean, "nu_mean"=nu_mean, "Zmean_save"=Zmean_save,
              # (ABOVE) Summary stats for parameters
              "GBpV_Y"=GBpV_Y, "GBpV_DR"=GBpV_DR)
              # (ABOVE) Global Bayesian p-values for whether DR curve and Y are zero everywhere.
